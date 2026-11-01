@@ -6,7 +6,7 @@
 set -euo pipefail
 base="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 work="$(mktemp -d)"
-case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) os=windows; exe=.exe; work="$(cygpath -m "$work")"; base="$(cygpath -m "$base")";; Darwin) os=macos; exe=;; *) os=linux; exe=;; esac
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) os=windows; exe=.exe; work="$(cygpath -m -l "$work")"; base="$(cygpath -m "$base")";; Darwin) os=macos; exe=;; *) os=linux; exe=;; esac
 echo "==> $os, work in $work"
 pkg="$work/pkg"; mkdir -p "$pkg/app/bin"
 printf 'hello from the app\n' > "$pkg/app/bin/hello.txt"
@@ -34,7 +34,8 @@ port=$((20000 + RANDOM % 20000))
 (cd "$pkg" && python3 -m http.server "$port" --bind 127.0.0.1 >/dev/null 2>&1) &
 server=$!
 trap 'kill $server 2>/dev/null || true' EXIT INT TERM PIPE
-sleep 2
+for i in $(seq 1 60); do curl -fsS -o /dev/null "http://127.0.0.1:$port/install.yaml" && break; sleep 0.5; done
+[ "$os" = macos ] && mkdir -p "$HOME/Desktop"
 
 if [ "$os" = macos ]; then
   # the .app: its launcher picks the executable of this Mac; the installer of the package is a zip too
@@ -59,6 +60,7 @@ else
   fi
 fi
 "$setup" --check
+set -x
 folder="$work/installed/CI App"
 "$setup" --silent --folder="$folder"
 test -f "$folder/bin/hello.txt"

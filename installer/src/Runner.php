@@ -382,6 +382,8 @@ final class Runner
                 @unlink($link);
                 if (@symlink($target, $link)) {
                     $this->manifest['shortcuts'][] = $link;
+                } else {
+                    $this->log[] = "  could not make the shortcut $link";
                 }
                 break;
             default:
