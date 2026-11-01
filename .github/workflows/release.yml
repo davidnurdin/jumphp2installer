@@ -63,7 +63,7 @@ jobs:
         run: |
           case "${{ runner.os }}" in
             Windows) base=installers/jumphp2installer-windows-x86_64.exe ;;
-            macOS) ditto -x -k installers/jumphp2installer-macos.zip mac && base="$(ls -d mac/*.app)/Contents/MacOS/jumphp2installer" ;;
+            macOS) base=installers/jumphp2installer-macos.zip ;;
             *) base=installers/jumphp2installer-linux-x86_64; chmod +x "$base" ;;
           esac
           tools/ci/try-installer.sh "$base"
@@ -74,7 +74,7 @@ jobs:
         run: |
           case "${{ runner.os }}" in
             Windows) installers/jumphp2installer-windows-x86_64.exe 2>&1 | tee run.log ;;
-            macOS) "$(ls -d mac/*.app)/Contents/MacOS/jumphp2installer" 2>&1 | tee run.log ;;
+            macOS) ditto -x -k installers/jumphp2installer-macos.zip mac && "$(ls -d mac/*.app)/Contents/MacOS/jumphp2installer" 2>&1 | tee run.log ;;
             *) sudo apt-get update -q && sudo apt-get install -yq libwebkit2gtk-4.1-0 xvfb >/dev/null
                xvfb-run -a installers/jumphp2installer-linux-x86_64 2>&1 | tee run.log ;;
           esac

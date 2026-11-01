@@ -2,7 +2,7 @@
 # Tries an installer for real on this computer (CI: Linux, Windows, macOS): serves a small package on localhost,
 # makes its installer from the base one (--make), installs it silently, checks the files / shortcut / uninstall entry,
 # then uninstalls it with the uninstaller it wrote and checks that nothing is left.
-#   tools/ci/try-installer.sh <base installer executable>
+#   tools/ci/try-installer.sh <base installer>     (macOS: jumphp2installer-macos.zip)
 set -euo pipefail
 base="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 work="$(mktemp -d)"
@@ -30,16 +30,29 @@ steps:
     if: desktop
   - uninstaller
 YAML
-port=8769
+port=$((20000 + RANDOM % 20000))
 (cd "$pkg" && python3 -m http.server "$port" --bind 127.0.0.1 >/dev/null 2>&1) &
 server=$!
-trap 'kill $server 2>/dev/null || true' EXIT
+trap 'kill $server 2>/dev/null || true' EXIT INT TERM PIPE
 sleep 2
 
-"$base" --version
-"$base" --make="$work/CI-App-setup$exe" --server="http://127.0.0.1:$port/" --from="$base"
-setup="$work/CI-App-setup$exe"
-[ "$os" = windows ] || chmod +x "$setup"
+if [ "$os" = macos ]; then
+  # the .app: its launcher picks the executable of this Mac; the installer of the package is a zip too
+  ditto -x -k "$base" "$work/base-app"
+  runner="$(ls -d "$work"/base-app/*.app)/Contents/MacOS/jumphp2installer"
+  "$runner" --version
+  "$runner" --make="$work/CI-App-setup.zip" --server="http://127.0.0.1:$port/" --from="$base"
+  ditto -x -k "$work/CI-App-setup.zip" "$work/setup-app"
+  setup="$(ls -d "$work"/setup-app/*.app)/Contents/MacOS/jumphp2installer"
+else
+  cp "$base" "$work/base$exe"
+  "$base" --version
+  "$base" --make="$work/CI-App-setup$exe" --server="http://127.0.0.1:$port/" --from="$work/base$exe"
+  setup="$work/CI-App-setup$exe"
+  echo "sizes: $(wc -c < "$work/base$exe") -> $(wc -c < "$setup"), bytes changed: $(cmp -l "$work/base$exe" "$setup" | wc -l)"
+  cmp -l "$work/base$exe" "$setup" | head -3 || true
+  [ "$os" = windows ] || chmod +x "$setup"
+fi
 "$setup" --check
 folder="$work/installed/CI App"
 "$setup" --silent --folder="$folder"
