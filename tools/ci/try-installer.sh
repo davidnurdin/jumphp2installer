@@ -6,7 +6,7 @@
 set -euo pipefail
 base="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 work="$(mktemp -d)"
-case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) os=windows; exe=.exe; work="$(cygpath -m -l "$work")"; base="$(cygpath -m "$base")";; Darwin) os=macos; exe=;; *) os=linux; exe=;; esac
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) os=windows; export MSYS2_ARG_CONV_EXCL="*"; exe=.exe; work="$(cygpath -m -l "$work")"; base="$(cygpath -m "$base")";; Darwin) os=macos; exe=;; *) os=linux; exe=;; esac
 echo "==> $os, work in $work"
 pkg="$work/pkg"; mkdir -p "$pkg/app/bin"
 printf 'hello from the app\n' > "$pkg/app/bin/hello.txt"
