@@ -41,3 +41,17 @@ steps:
 
 Any static host works the same way (GitHub Pages, a bucket, a folder of a web server): put `install.yaml` and its
 files in a folder and make the installers with `php tools/package-release.php <folder> https://host/folder/ <bases> <out>`.
+
+## A repository with several products
+
+`github:owner/repo` and `version: {github: owner/repo}` follow the repository's **latest** release. When one
+repository releases several products (`v*` for one, `ide-v*` for another), the latest release may be another
+product's. Use the static mode instead, from the repository's files on its main branch:
+
+- the package: `https://raw.githubusercontent.com/owner/repo/main/path/to/installer/` (its `install.yaml` and files);
+- the version: a `version.json` (`{"version": "1.2.0"}`) in that folder, updated at each release of the product,
+  with `version: {latest: https://raw.githubusercontent.com/owner/repo/main/path/to/installer/version.json}`;
+- the downloads: the product's own tag, `https://github.com/owner/repo/releases/download/ide-v{version}/...`.
+
+Make its installers with `php tools/package-release.php <folder> <that raw address> <bases> <out>` and attach them to
+the product's release. JumPHP's IDE does this (`games/ide/installer/` of the JumPHP repository).

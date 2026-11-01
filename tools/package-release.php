@@ -7,6 +7,7 @@
 //   php tools/package-release.php <package folder> <source> <base installers folder> <out folder>
 //     source: github:owner/repo (the newest release) | https://host/folder/
 require __DIR__ . '/../installer/src/Binary.php';
+require __DIR__ . '/../installer/src/Zip.php';
 
 use JumPHP2Installer\Binary;
 

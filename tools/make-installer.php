@@ -7,6 +7,7 @@
 //
 //   php tools/make-installer.php installer-windows-x86_64.exe "MyApp-setup.exe" github:me/myapp
 require __DIR__ . '/../installer/src/Binary.php';
+require __DIR__ . '/../installer/src/Zip.php';
 
 [$self, $in, $out, $source] = $argv + [null, null, null, null];
 $package = $argv[4] ?? 'static';
