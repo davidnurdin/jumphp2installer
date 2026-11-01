@@ -37,7 +37,8 @@ final class Vars
     public static function forThisComputer(array $app = []): self
     {
         $os = self::os();
-        $home = rtrim((string)(getenv('HOME') ?: getenv('USERPROFILE') ?: sys_get_temp_dir()), '/\\');
+        // Windows: USERPROFILE (HOME, when a Unix shell set it, is not a Windows path)
+        $home = rtrim((string)(($os === 'windows' ? getenv('USERPROFILE') : false) ?: getenv('HOME') ?: getenv('USERPROFILE') ?: sys_get_temp_dir()), '/\\');
         $values = [
             'os' => $os,
             'arch' => self::arch(),

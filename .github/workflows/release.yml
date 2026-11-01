@@ -1,0 +1,110 @@
+# The installers of jumphp2installer for every desktop system, built, tried for real, then put into a release:
+#   jumphp2installer-linux-x86_64, jumphp2installer-windows-x86_64.exe, jumphp2installer-macos.zip (Apple silicon + Intel)
+# A tag v* publishes the release; Actions > release > Run workflow only builds and tries them.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: zip, mbstring
+      - name: The library's tests
+        working-directory: installer
+        run: composer install -q && vendor/bin/phpunit
+
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bin/jumphp app:export installer --linux --windows --macos
+        run: |
+          bin/jumphp install installer
+          games/installer/tools/sync-lib.sh
+          bin/jumphp app:test installer
+          bin/jumphp app:export installer --linux --windows --macos
+          mkdir out
+          cp games/installer/dist/standalone/installer-linux-x86_64 out/jumphp2installer-linux-x86_64
+          cp games/installer/dist/standalone/installer-windows-x86_64.exe out/jumphp2installer-windows-x86_64.exe
+          cp games/installer/dist/standalone/installer-macos.zip out/jumphp2installer-macos.zip
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers
+          path: out/
+
+  try:
+    needs: export
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: installers
+          path: installers
+      - name: Install, then uninstall, for real
+        run: |
+          case "${{ runner.os }}" in
+            Windows) base=installers/jumphp2installer-windows-x86_64.exe ;;
+            macOS) ditto -x -k installers/jumphp2installer-macos.zip mac && base="$(ls -d mac/*.app)/Contents/MacOS/jumphp2installer" ;;
+            *) base=installers/jumphp2installer-linux-x86_64; chmod +x "$base" ;;
+          esac
+          tools/ci/try-installer.sh "$base"
+      - name: The window (its page loads, PHP answers)
+        env:
+          JUMPHP_SMOKE: '1'
+          JUMPHP_MAX_FRAMES: '300'
+        run: |
+          case "${{ runner.os }}" in
+            Windows) installers/jumphp2installer-windows-x86_64.exe 2>&1 | tee run.log ;;
+            macOS) "$(ls -d mac/*.app)/Contents/MacOS/jumphp2installer" 2>&1 | tee run.log ;;
+            *) sudo apt-get update -q && sudo apt-get install -yq libwebkit2gtk-4.1-0 xvfb >/dev/null
+               xvfb-run -a installers/jumphp2installer-linux-x86_64 2>&1 | tee run.log ;;
+          esac
+          grep -q 'smoke test OK' run.log
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, try]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: installers
+          path: installers
+      - name: The release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'MD'
+          The installer of jumphp2installer, for every desktop system. A server (or `tools/package-release.php`) writes a
+          package's address into it: users then download `My-App-setup-<id>.exe` and the like.
+
+          | System | File |
+          |---|---|
+          | Windows 10 / 11 (64-bit) | `jumphp2installer-windows-x86_64.exe` |
+          | macOS 12+ (Apple silicon, Intel) | `jumphp2installer-macos.zip` (not signed: right click > Open the first time) |
+          | Linux x86_64 (WebKitGTK 4.1 for the window; `--silent` needs nothing) | `jumphp2installer-linux-x86_64` |
+
+          `--help` lists the command line: `--silent`, `--uninstall`, `--check`, `--make`. Docs: docs/README.md.
+          MD
+          gh release create "$GITHUB_REF_NAME" installers/* -R "$GITHUB_REPOSITORY" --title "jumphp2installer $GITHUB_REF_NAME" --notes-file notes.md
