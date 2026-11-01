@@ -1,0 +1,19 @@
+{
+    "name": "jumphp2installer/installer",
+    "description": "jumphp2installer's core: the install script (YAML), its checks, its variables, the steps that run it, the downloader and the patcher of installer executables. Shared by the installer (games/installer), the web server (server/) and any site that serves installers.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "symfony/yaml": "^6.4 || ^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": { "JumPHP2Installer\\": "src/" }
+    },
+    "autoload-dev": {
+        "psr-4": { "JumPHP2Installer\\Tests\\": "tests/" }
+    }
+}

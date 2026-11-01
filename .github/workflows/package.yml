@@ -1,0 +1,68 @@
+# A package in GitHub releases, its installers too: no web server. Use it from the repository of your software:
+#
+#   # .github/workflows/installer.yml
+#   on:
+#     release:
+#       types: [published]
+#   jobs:
+#     installer:
+#       uses: davidnurdin/jumphp2installer/.github/workflows/package.yml@main
+#       with:
+#         folder: installer          # install.yaml and its files (images, license...) in your repository
+#       permissions:
+#         contents: write
+#
+# Each published release then gets install.yaml, its files, and Name-setup.exe / Name-setup-linux-x86_64 /
+# Name-setup-macos.zip: installers that install the newest release (docs/github.md).
+name: package
+on:
+  workflow_call:
+    inputs:
+      folder:
+        description: The folder of install.yaml and its files, in the calling repository
+        type: string
+        default: installer
+      tag:
+        description: The release to fill (default: the one that started the workflow)
+        type: string
+        default: ''
+      installer:
+        description: The release of jumphp2installer whose base installers are used
+        type: string
+        default: latest
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: davidnurdin/jumphp2installer
+          path: .jumphp2installer
+          sparse-checkout: |
+            installer/src
+            tools
+      - name: Base installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .j2i/bases .j2i/out
+          if [ "${{ inputs.installer }}" = latest ]; then
+            gh release download -R davidnurdin/jumphp2installer -p 'jumphp2installer-*' -D .j2i/bases
+          else
+            gh release download "${{ inputs.installer }}" -R davidnurdin/jumphp2installer -p 'jumphp2installer-*' -D .j2i/bases
+          fi
+      - name: Package and installers
+        run: php .jumphp2installer/tools/package-release.php "${{ inputs.folder }}" "github:${{ github.repository }}" .j2i/bases .j2i/out
+      - name: Into the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.tag }}"
+          [ -n "$tag" ] || tag="${{ github.event.release.tag_name }}"
+          [ -n "$tag" ] || tag="$(gh release view --json tagName -q .tagName)"
+          gh release upload "$tag" .j2i/out/* --clobber
+          echo "### Installers in $tag" >> "$GITHUB_STEP_SUMMARY"
+          ls .j2i/out | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY"

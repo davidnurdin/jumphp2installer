@@ -1,0 +1,46 @@
+# The demo package: what bin/jumphp app:run installer / app:shot installer show (nothing is downloaded).
+# A real package downloads its software: see docs/script.md and examples/.
+installer: 1
+
+app:
+  name: Pixel Notes
+  publisher: JumPHP
+  website: https://jumphp.net
+  icon: images/icon.png
+  banner: images/banner.png
+  accent: "#6d4aff"
+  size: 1 MB
+
+version: 1.2.0
+
+pages:
+  - welcome:
+      title: Welcome to Pixel Notes
+      text: |
+        This wizard installs {app} {version} on this computer.
+
+        {app} is a tiny notepad made with JumPHP. Close the other programs before you go on.
+  - license: LICENSE.txt
+  - folder: "{programs}/{app}"
+  - options:
+      desktop: {label: "A shortcut on the desktop", default: true}
+      menu: {label: "A shortcut in the menu", default: true}
+      samples: {label: "Sample notes", default: false}
+  - install
+  - finish:
+      text: "{app} {version} is installed."
+      run: "{folder}/readme.txt"
+      label: "Open the read-me"
+
+steps:
+  - mkdir: "{folder}/notes"
+  - write:
+      file: "{folder}/readme.txt"
+      text: "{app} {version}, installed by jumphp2installer on {os} ({arch}).\n"
+  - write: {file: "{folder}/notes/hello.txt", text: "Hello from {app}!\n"}
+    if: samples
+  - shortcut: {target: "{folder}/readme.txt", name: "{app}", where: desktop}
+    if: desktop
+  - shortcut: {target: "{folder}/readme.txt", name: "{app}", where: menu}
+    if: menu
+  - uninstaller

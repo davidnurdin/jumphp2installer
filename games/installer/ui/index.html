@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Setup</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wizard" id="wizard">
+    <aside class="side" id="side">
+      <img id="banner" alt="" hidden>
+      <div class="side-text" id="side-text">
+        <img id="side-icon" alt="" hidden>
+        <strong id="side-name"></strong>
+        <span id="side-version"></span>
+      </div>
+    </aside>
+    <section class="main">
+      <header class="head">
+        <div>
+          <h1 id="title">…</h1>
+          <p id="subtitle"></p>
+        </div>
+        <img id="icon" alt="" hidden>
+      </header>
+      <div class="content" id="content">
+        <div class="loading"><span class="spinner"></span><span id="loading-text">Loading…</span></div>
+      </div>
+    </section>
+    <footer class="foot">
+      <span class="brand" id="brand">jumphp2installer</span>
+      <span class="grow"></span>
+      <button id="back" class="secondary" hidden>‹ Back</button>
+      <button id="next" class="primary" disabled>Next ›</button>
+      <button id="cancel" class="secondary">Cancel</button>
+    </footer>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

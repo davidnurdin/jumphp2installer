@@ -1,0 +1,25 @@
+# jumphp2installer's installer: a desktop app (ui: webview, docs/tauri.md). The same executable installs any package:
+# its server writes its own address and the package's id into it (JumPHP2Installer\Binary) when someone downloads it.
+game:
+  id: jumphp2installer
+  title: "Setup"
+  version: 0.1.0
+  description: "The installer of jumphp2installer: downloads and installs the newest version of a package, with its pictures, license, options and uninstaller."
+  lang: en
+  ui: webview
+  main: App\Main                # also App\Main::cli(): --silent, --uninstall, --check, --help
+  app:
+    identifier: net.jumphp.installer
+    pages: ui
+    tick_hz: 60
+    native_commands: false
+    window:
+      url: index.html
+      title: "Setup"
+      width: 660
+      height: 470
+      min_width: 520
+      min_height: 400
+      resizable: false
+      center: true
+      devtools: false

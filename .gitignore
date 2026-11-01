@@ -24,3 +24,8 @@ core.[0-9]*
 /ide/composer.lock
 /ide/.phpunit.cache/
 /ide/ui/vendor/
+/installer/vendor/
+/installer/composer.lock
+/installer/.phpunit.cache/
+/.build-release.*/
+/installer/.phpunit.result.cache
