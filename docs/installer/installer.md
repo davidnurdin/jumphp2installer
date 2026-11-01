@@ -65,7 +65,7 @@ bin/jumphp app:export installer --linux --windows --macos
 tools/ci/try-installer.sh games/installer/dist/standalone/installer-linux-x86_64   # install + uninstall for real
 ```
 
-A tag `v*` runs `.github/workflows/release.yml`: the same on GitHub, tried on Linux, Windows and two Macs, then the
+A tag `installer-v<version>` (game.yaml version; `v*` tags are JumPHP's own) runs `.github/workflows/release.yml`: the same on GitHub, tried on Linux, Windows and two Macs, then the
 release. The library's own tests: `bin/jumphp php installer vendor/bin/phpunit` (after
 `bin/jumphp php installer /usr/bin/composer install`).
 

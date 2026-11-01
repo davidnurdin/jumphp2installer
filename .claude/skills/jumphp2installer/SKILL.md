@@ -66,7 +66,7 @@ games/installer/tools/sync-lib.sh && bin/jumphp app:test installer
 bin/jumphp app:export installer --linux --windows --macos
 tools/ci/try-installer.sh games/installer/dist/standalone/installer-linux-x86_64
 ```
-A tag `v*` builds, tries (Linux, Windows, 2 Macs) and releases them (`.github/workflows/release.yml`).
+A tag `installer-v<version>` (not `v*`: those are JumPHP's) builds, tries (Linux, Windows, 2 Macs) and releases them (`.github/workflows/release.yml`).
 
 ## Limits (say so when relevant)
 
