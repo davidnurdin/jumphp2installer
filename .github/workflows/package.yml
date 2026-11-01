@@ -23,7 +23,7 @@ on:
         type: string
         default: installer
       tag:
-        description: The release to fill (default: the one that started the workflow)
+        description: 'The release to fill (default: the one that started the workflow)'
         type: string
         default: ''
       installer:
