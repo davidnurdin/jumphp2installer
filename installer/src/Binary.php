@@ -46,7 +46,7 @@ final class Binary
 
     /**
      * patch() on a file: an installer executable (Linux, Windows), or the .zip of the macOS app (its executable,
-     * Contents/MacOS/*, is patched inside; ZipArchive needed). Writes $out.
+     * Contents/MacOS/*, is patched inside: Zip). Writes $out.
      */
     public static function patchFile(string $in, string $out, string $server, string $package): void
     {
@@ -61,34 +61,17 @@ final class Binary
             @chmod($out, 0755);
             return;
         }
-        if (!class_exists(\ZipArchive::class)) {
-            throw new \RuntimeException('the zip extension is needed to patch the macOS app');
-        }
-        if ($in !== $out && !@copy(self::readable($in), $out)) {
-            throw new \RuntimeException("cannot write $out");
-        }
-        $zip = new \ZipArchive();
-        if ($zip->open($out) !== true) {
-            throw new \RuntimeException("$in: not a zip");
-        }
-        $patched = 0;
-        for ($i = 0; $i < $zip->numFiles; $i++) {
-            $name = (string)$zip->getNameIndex($i);
-            if (!preg_match('#\.app/Contents/MacOS/[^/]+$#', $name)) {
-                continue;
+        unset($data);
+        $patched = Zip::rewrite($in, $out, static function (string $name, string $bytes) use ($server, $package): ?string {
+            if (!preg_match('#\\.app/Contents/MacOS/[^/]+$#', $name)) {
+                return null;
             }
-            $bytes = (string)$zip->getFromIndex($i);
             try {
-                $new = self::patch($bytes, $server, $package);
+                return self::patch($bytes, $server, $package);
             } catch (\RuntimeException) {
-                continue;       // another program of the app (not the installer)
+                return null;    // another program of the app (not the installer)
             }
-            $zip->getExternalAttributesIndex($i, $os, $attr);
-            $zip->addFromString($name, $new, \ZipArchive::FL_OVERWRITE);
-            $zip->setExternalAttributesName($name, $os, $attr);
-            $patched++;
-        }
-        $zip->close();
+        });
         if ($patched === 0) {
             @unlink($out);
             throw new \RuntimeException("$in: no installer executable in this macOS app");

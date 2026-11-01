@@ -52,6 +52,11 @@ else
   echo "sizes: $(wc -c < "$work/base$exe") -> $(wc -c < "$setup"), bytes changed: $(cmp -l "$work/base$exe" "$setup" | wc -l)"
   cmp -l "$work/base$exe" "$setup" | head -3 || true
   [ "$os" = windows ] || chmod +x "$setup"
+  if [ "$os" = windows ]; then
+    # which of the name or the patch a real Windows minds
+    cp "$work/base$exe" "$work/copy-setup$exe"; cp "$setup" "$work/patched$exe"
+    for f in base copy-setup patched; do echo "--- $f$exe:"; "$work/$f$exe" --version 2>&1 | head -2 || true; done
+  fi
 fi
 "$setup" --check
 folder="$work/installed/CI App"
