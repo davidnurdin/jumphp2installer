@@ -1,0 +1,49 @@
+# A JumPHP game or desktop app: `bin/jumphp app:export myapp --linux --windows --macos` (or export:standalone for a
+# game) makes myapp-linux-x86_64, myapp-windows-x86_64.exe and myapp-macos.zip (My App.app inside). Attach the three to
+# each GitHub release (tag v1.2.0); this script installs the newest one.
+installer: 1
+
+app:
+  name: My App
+  publisher: Me
+  icon: icon.png
+  banner: banner.png
+
+version:
+  github: OWNER/REPO
+
+pages:
+  - welcome
+  - folder: "{programs}/{app}"
+  - options:
+      desktop: A shortcut on the desktop
+  - install
+  - finish:
+      run:
+        windows: "{folder}/myapp.exe"
+        linux: "{folder}/myapp"
+        macos: "{folder}/My App.app"
+
+
+steps:
+  # Windows and Linux: one executable
+  - download: https://github.com/OWNER/REPO/releases/download/v{version}/myapp-windows-x86_64.exe
+    os: windows
+  - download: https://github.com/OWNER/REPO/releases/download/v{version}/myapp-linux-x86_64
+    os: linux
+  - copy: {from: "{download}", to: "{folder}/myapp{exe}"}
+    os: [windows, linux]
+  - executable: "{folder}/myapp"
+    os: linux
+  - shortcut: {target: "{folder}/myapp{exe}", where: both}
+    if: desktop
+    os: [windows, linux]
+  # macOS: the .app (My App.app in the zip)
+  - download: https://github.com/OWNER/REPO/releases/download/v{version}/myapp-macos.zip
+    os: macos
+  - extract: "{folder}"
+    os: macos
+  - shortcut: {target: "{folder}/My App.app", where: desktop}
+    if: desktop
+    os: macos
+  - uninstaller

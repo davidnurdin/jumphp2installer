@@ -8,6 +8,9 @@ game:
   lang: en
   ui: webview
   main: App\Main                # also App\Main::cli(): --silent, --uninstall, --check, --help
+  # room in the executable's php.ini section for the server's address and the package's id (JumPHP2Installer\Binary
+  # writes them there at the same size: Windows' micro must find its PHAR where it was)
+  php_ini: "jumphp2installer.reserve=........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................"
   app:
     identifier: net.jumphp.installer
     pages: ui

@@ -1,5 +1,5 @@
 # The demo package: what bin/jumphp app:run installer / app:shot installer show (nothing is downloaded).
-# A real package downloads its software: see docs/script.md and examples/.
+# A real package downloads its software: see docs/installer/script.md and docs/installer/examples/.
 installer: 1
 
 app:

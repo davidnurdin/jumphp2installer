@@ -59,5 +59,17 @@ final class VarsTest extends TestCase
         self::assertSame('k2q9x7a1', Binary::packageFromFileName('C:\\Downloads\\Hello-App-setup-k2q9x7a1 (1).exe'));
         self::assertSame('k2q9x7a1', Binary::packageFromFileName('/home/a/Hello-App-setup-k2q9x7a1'));
         self::assertNull(Binary::packageFromFileName('/home/a/setup.exe'));
+
+        // a released installer reserves room: patched, it keeps its size exactly
+        $ini = "ffi.enable=1\n" . Binary::RESERVE . str_repeat('.', 400) . "\n";
+        $base = 'MICRO' . "\xfd\xf6\x69\xe6" . pack('N', strlen($ini)) . $ini . 'PHAR';
+        $once = Binary::patch($base, 'https://jumphp.net/installers', 'k2q9x7a1');
+        self::assertSame(strlen($base), strlen($once));
+        self::assertSame('k2q9x7a1', Binary::settings($once)['jumphp2installer.package']);
+        $twice = Binary::patch($once, 'github:me/app', 'static');
+        self::assertSame(strlen($base), strlen($twice));
+        self::assertSame('github:me/app', Binary::settings($twice)['jumphp2installer.server']);
+        $this->expectExceptionMessage('too long');
+        Binary::patch($base, 'https://' . str_repeat('x', 500), 'id');
     }
 }

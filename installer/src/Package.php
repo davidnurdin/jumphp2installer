@@ -5,7 +5,7 @@ namespace JumPHP2Installer;
 /**
  * A package: an install script and its files (images, license, small files to copy), as a server serves it.
  *
- * The API every server answers (docs/api.md), {server} being its address:
+ * The API every server answers (docs/installer/server.md), {server} being its address:
  *   GET {server}/api/packages/{id}                -> {"id", "name", "script" (the YAML), "assets" (address of its files)}
  *   GET {server}/api/packages/{id}/assets/{file}  -> a file of the package (assets: "images/banner.png")
  *   GET {server}/download/{id}/{platform}         -> the installer with the server and the id written in (Binary)

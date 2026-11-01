@@ -1,0 +1,7 @@
+# The smallest script: the default pages (welcome, folder, install, finish), one zip.
+app: {name: Tiny Tool}
+version: 1.0.0
+steps:
+  - download: https://example.com/tiny-tool/tiny-tool-{version}-{platform}.zip
+  - extract
+  - uninstaller

@@ -53,7 +53,7 @@ final class Command
             return $p !== false && pclose($p) !== -1;
         }
         $q = escapeshellarg($program);
-        $line = PHP_OS_FAMILY === 'Darwin' && str_ends_with($program, '.app') ? "open $q" : "cd " . escapeshellarg($cwd) . " && nohup $q >/dev/null 2>&1 &";
+        $line = PHP_OS_FAMILY === 'Darwin' && (str_ends_with($program, '.app') || is_dir($program)) ? "open $q" : "cd " . escapeshellarg($cwd) . " && nohup $q >/dev/null 2>&1 &";
         $c = self::run(['sh', '-c', $line]);
         return $c->ok();
     }

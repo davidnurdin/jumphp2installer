@@ -35,6 +35,8 @@ final class Runner
     private int $entriesDone = 0;
     private int $entriesTotal = 0;
     private string $archiveBase = '';
+    /** @var array<string, int> a zip's Unix modes by entry name (PharData does not read them) */
+    private array $modes = [];
     /** @var list<Command> */
     private array $commands = [];
     private bool $started = false;
@@ -193,6 +195,7 @@ final class Runner
             $this->archiveBase = 'phar://' . str_replace('\\', '/', $archive);
             $this->entriesTotal = max(1, $phar->count());
             $this->entriesDone = 0;
+            $this->modes = str_ends_with($archive, '.zip') ? self::zipModes($archive) : [];
             $this->entries = new \RecursiveIteratorIterator($phar, \RecursiveIteratorIterator::SELF_FIRST);
             $this->entries->rewind();
             $this->makeDir($into);
@@ -217,7 +220,8 @@ final class Runner
                         throw new \RuntimeException("cannot write $to");
                     }
                     $this->addFile($to);
-                    if (PHP_OS_FAMILY !== 'Windows' && ($entry->getPerms() & 0111)) {
+                    $mode = $this->modes[$relative] ?? $entry->getPerms();
+                    if (PHP_OS_FAMILY !== 'Windows' && ($mode & 0111 || preg_match('#\.app/Contents/MacOS/[^/]+$#', $relative))) {
                         @chmod($to, 0755);
                     }
                 }
@@ -518,6 +522,41 @@ final class Runner
             throw new \RuntimeException("cannot read $file");
         }
         return $copy;
+    }
+
+    /**
+     * The Unix modes of a zip's entries (its central directory: the upper 16 bits of the external attributes, when the
+     * zip was made on Unix). Executables keep their x bit after extract. @return array<string, int>
+     */
+    public static function zipModes(string $zip): array
+    {
+        $h = @fopen($zip, 'rb');
+        if (!$h) {
+            return [];
+        }
+        $size = (int)filesize($zip);
+        $tail = min($size, 65557);
+        fseek($h, $size - $tail);
+        $end = (string)fread($h, $tail);
+        $at = strrpos($end, "PK\x05\x06");
+        if ($at === false || strlen($end) < $at + 22) {
+            fclose($h);
+            return [];
+        }
+        $eocd = unpack('ventries/Vsize/Voffset', substr($end, $at + 10, 10));
+        fseek($h, (int)$eocd['offset']);
+        $dir = (string)fread($h, min((int)$eocd['size'], 64 * 1024 * 1024));
+        fclose($h);
+        $modes = [];
+        for ($p = 0, $n = 0; $n < $eocd['entries'] && substr($dir, $p, 4) === "PK\x01\x02"; $n++) {
+            $e = unpack('vmadeBy/x2/x2/x2/x4/x4/x4/x4/vnameLen/vextraLen/vcommentLen/x2/x2/Vattr', substr($dir, $p + 4, 42));
+            $name = substr($dir, $p + 46, $e['nameLen']);
+            if (($e['madeBy'] >> 8) === 3) {          // made on Unix
+                $modes[rtrim($name, '/')] = ($e['attr'] >> 16) & 0xFFFF;
+            }
+            $p += 46 + $e['nameLen'] + $e['extraLen'] + $e['commentLen'];
+        }
+        return $modes;
     }
 
     private function copyTree(string $from, string $to, bool $record = true): void

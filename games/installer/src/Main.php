@@ -204,7 +204,7 @@ final class Main implements AppMain, AppCli
     private function finish(bool $run): bool
     {
         $target = null;
-        foreach ($this->session?->package?->script->toArray()['pages'] ?? [] as $page) {
+        foreach ($this->session?->isReady() ? $this->session->view()['pages'] : [] as $page) {
             if ($page['type'] === 'finish' && $page['run'] !== null) {
                 $target = $this->runner?->vars()->path($page['run']);
             }

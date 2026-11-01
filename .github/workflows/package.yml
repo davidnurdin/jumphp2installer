@@ -13,7 +13,7 @@
 #         contents: write
 #
 # Each published release then gets install.yaml, its files, and Name-setup.exe / Name-setup-linux-x86_64 /
-# Name-setup-macos.zip: installers that install the newest release (docs/github.md).
+# Name-setup-macos.zip: installers that install the newest release (docs/installer/github.md).
 name: package
 on:
   workflow_call:

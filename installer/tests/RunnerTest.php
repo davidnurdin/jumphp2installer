@@ -24,6 +24,9 @@ final class RunnerTest extends TestCase
         $zip = new \ZipArchive();
         $zip->open("$this->pkg/hello.zip", \ZipArchive::CREATE);
         $zip->addFromString('hello-1.0/hello', "#!/bin/sh\necho hello\n");
+        $zip->setExternalAttributesName('hello-1.0/hello', \ZipArchive::OPSYS_UNIX, 0100755 << 16);
+        $zip->addFromString('hello-1.0/data/plain.txt', 'not executable');
+        $zip->setExternalAttributesName('hello-1.0/data/plain.txt', \ZipArchive::OPSYS_UNIX, 0100644 << 16);
         $zip->addFromString('hello-1.0/data/levels.txt', 'level 1');
         $zip->addEmptyDir('hello-1.0/empty');
         $zip->close();
@@ -64,7 +67,6 @@ final class RunnerTest extends TestCase
         steps:
           - download: hello.zip
           - extract: {strip: 1}
-          - executable: "{folder}/hello"
           - write: {file: "{folder}/version.txt", text: "{app} {version} on {os}"}
             label: Writing the version
           - write: {file: "{folder}/README.txt", text: "read me"}
@@ -90,7 +92,8 @@ final class RunnerTest extends TestCase
         self::assertNull($runner->error, implode("\n", $runner->log));
         $folder = "$this->root/home/opt/Hello";
         self::assertSame("#!/bin/sh\necho hello\n", file_get_contents("$folder/hello"));
-        self::assertTrue(is_executable("$folder/hello"));
+        self::assertTrue(is_executable("$folder/hello"));     // its mode in the zip
+        self::assertFalse(is_executable("$folder/data/plain.txt"));
         self::assertSame('level 1', file_get_contents("$folder/data/levels.txt"));
         self::assertDirectoryExists("$folder/empty");
         self::assertSame('Hello 1.0 on linux', file_get_contents("$folder/version.txt"));

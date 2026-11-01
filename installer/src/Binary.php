@@ -16,15 +16,31 @@ final class Binary
 {
     private const MAGIC = "\xfd\xf6\x69\xe6";
 
-    /** $binary with the server and the package written in; throws when it has no ini section of an installer. */
+    /** The line the base installer reserves (game.yaml php_ini): patched at the same size, nothing moves. */
+    public const RESERVE = 'jumphp2installer.reserve=';
+
+    /**
+     * $binary with the server and the package written in; throws when it has no ini section of an installer.
+     * When the section has a reserve line (the released installers do), the section keeps its exact size: the
+     * reserve shrinks by what is added (Windows' micro finds its PHAR by offsets that must not move). Without one,
+     * the section grows (enough on Linux and macOS).
+     */
     public static function patch(string $binary, string $server, string $package): string
     {
         [$offset, $length, $ini] = self::section($binary);
+        $reserved = str_contains($ini, "\n" . self::RESERVE) || str_starts_with($ini, self::RESERVE);
         $lines = array_values(array_filter(explode("\n", $ini), static fn (string $l): bool =>
             trim($l) !== '' && !str_starts_with(ltrim($l), 'jumphp2installer.')));
         $lines[] = 'jumphp2installer.server="' . addcslashes($server, '"\\') . '"';
         $lines[] = 'jumphp2installer.package="' . addcslashes($package, '"\\') . '"';
         $newIni = implode("\n", $lines) . "\n";
+        if ($reserved) {
+            $room = $length - strlen($newIni) - strlen(self::RESERVE) - 1;
+            if ($room < 0) {
+                throw new \RuntimeException('the address and the id are too long for this installer (' . (strlen($newIni) - $length) . ' characters too many)');
+            }
+            $newIni .= self::RESERVE . str_repeat('.', $room) . "\n";
+        }
         return substr($binary, 0, $offset) . self::MAGIC . pack('N', strlen($newIni)) . $newIni . substr($binary, $offset + 8 + $length);
     }
 

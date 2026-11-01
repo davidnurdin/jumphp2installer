@@ -148,6 +148,9 @@ final class Session
             if ($page['type'] === 'folder') {
                 $page['default'] = $vars->path($page['default']);
             }
+            if ($page['type'] === 'finish' && is_array($page['run'])) {
+                $page['run'] = $page['run'][$vars->get('os')] ?? null;      // the program of this system
+            }
             if ($page['type'] === 'license') {
                 $page['text'] = $this->license ?? $page['text'] ?? '';
             }

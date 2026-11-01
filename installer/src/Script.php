@@ -6,7 +6,7 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * An install script (YAML, docs/script.md): what the installer shows (pages) and does (steps).
+ * An install script (YAML, docs/installer/script.md): what the installer shows (pages) and does (steps).
  *
  *   app:
  *     name: My App
@@ -235,7 +235,16 @@ final class Script
                     break;
                 case 'finish':
                     $value = is_string($value) ? ['text' => $value] : (array)($value ?? []);
-                    $page += ['text' => (string)($value['text'] ?? '{app} is installed.'), 'run' => isset($value['run']) ? (string)$value['run'] : null,
+                    $run = $value['run'] ?? null;
+                    if (is_array($run)) {
+                        foreach (array_keys($run) as $os) {
+                            if (!in_array($os, self::SYSTEMS, true)) {
+                                $this->problem("$path.run", "run: one program, or one per system ({windows: ..., linux: ..., macos: ...}), not '$os'");
+                            }
+                        }
+                        $run = array_map('strval', $run);
+                    }
+                    $page += ['text' => (string)($value['text'] ?? '{app} is installed.'), 'run' => is_array($run) ? $run : ($run !== null ? (string)$run : null),
                         'label' => (string)($value['label'] ?? 'Start {app}')];
                     break;
             }

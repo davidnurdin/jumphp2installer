@@ -1,0 +1,42 @@
+# Software whose builds are in GitHub releases: myapp-windows-x86_64.zip, myapp-linux-x86_64.tar.gz,
+# myapp-macos-arm64.zip... The installer always installs the newest release.
+installer: 1
+
+app:
+  name: My App
+  publisher: Me
+  website: https://github.com/OWNER/REPO
+  icon: icon.png
+  banner: banner.png
+  accent: "#0f9d58"
+  size: 25 MB
+
+version:
+  github: OWNER/REPO
+
+pages:
+  - welcome:
+      title: Welcome to My App
+      text: |
+        This installs My App {version} for you (no administrator rights needed).
+
+        Close My App before you go on if it is running.
+  - license: LICENSE.txt
+  - folder: "{programs}/{app}"
+  - options:
+      desktop: A shortcut on the desktop
+      menu: A shortcut in the menu
+  - install
+  - finish: {run: "{folder}/myapp{exe}"}
+
+steps:
+  - download: https://github.com/OWNER/REPO/releases/download/v{version}/myapp-{platform}.zip
+    os: [windows, macos]
+  - download: https://github.com/OWNER/REPO/releases/download/v{version}/myapp-{platform}.tar.gz
+    os: linux
+  - extract: {strip: 1}
+  - shortcut: {target: "{folder}/myapp{exe}", where: desktop}
+    if: desktop
+  - shortcut: {target: "{folder}/myapp{exe}", where: menu, icon: "{folder}/icon.png"}
+    if: menu
+  - uninstaller

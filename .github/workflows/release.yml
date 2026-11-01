@@ -105,6 +105,6 @@ jobs:
           | macOS 12+ (Apple silicon, Intel) | `jumphp2installer-macos.zip` (not signed: right click > Open the first time) |
           | Linux x86_64 (WebKitGTK 4.1 for the window; `--silent` needs nothing) | `jumphp2installer-linux-x86_64` |
 
-          `--help` lists the command line: `--silent`, `--uninstall`, `--check`, `--make`. Docs: docs/README.md.
+          `--help` lists the command line: `--silent`, `--uninstall`, `--check`, `--make`. Docs: docs/installer/README.md.
           MD
           gh release create "$GITHUB_REF_NAME" installers/* -R "$GITHUB_REPOSITORY" --title "jumphp2installer $GITHUB_REF_NAME" --notes-file notes.md
