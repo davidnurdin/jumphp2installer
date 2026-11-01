@@ -71,4 +71,5 @@ A tag `v*` builds, tries (Linux, Windows, 2 Macs) and releases them (`.github/wo
 ## Limits (say so when relevant)
 
 Not signed (SmartScreen / Gatekeeper warn the first time; macOS: right click › Open); per-user installs only; no
-Linux arm64, no phones; the wizard's own words in English and French.
+Linux arm64, no phones; the wizard's own words in English and French. Windows: start it by its long path, never an
+8.3 short one (`RUNNER~1`): micro then fails with "PharException: manifest cannot be larger than 100 MB".

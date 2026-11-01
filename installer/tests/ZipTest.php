@@ -43,4 +43,12 @@ final class ZipTest extends TestCase
         array_map('unlink', glob("$dir/*") ?: []);
         rmdir($dir);
     }
+
+    public function testAnArchiveEntryIsFoundEvenWhenPharNamesTheArchiveByItsRealPath(): void
+    {
+        $base = 'phar:///var/folders/x/T/j2i-1.zip';
+        self::assertSame('app/bin/a.txt', \JumPHP2Installer\Runner::insideArchive("$base/app/bin/a.txt", $base));
+        self::assertSame('app/bin/a.txt', \JumPHP2Installer\Runner::insideArchive('phar:///private/var/folders/x/T/j2i-1.zip/app/bin/a.txt', $base));
+        self::assertSame('app', \JumPHP2Installer\Runner::insideArchive('phar://C:/Users/RUNNER~1/AppData/Local/Temp/j2i-1.zip/app', 'phar://C:/Users/runneradmin/AppData/Local/Temp/j2i-1.zip'));
+    }
 }

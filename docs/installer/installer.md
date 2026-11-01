@@ -77,3 +77,7 @@ release. The library's own tests: `bin/jumphp php installer vendor/bin/phpunit` 
 - Updating in place: installing again over an install works (files replaced), but nothing yet tells an installed app
   that a newer version exists (JumPHP apps have their own updater: `bin/jumphp app:release`).
 - The wizard's own words exist in English and French (the script's texts are its author's).
+- Windows: started by a short 8.3 path (`C:\Users\RUNNER~1\...`, as some scripts and CI runners do), the
+  executable does not start ("PharException: manifest cannot be larger than 100 MB": StaticPHP's micro does not
+  know itself by that name). Explorer and a normal command line use the long path; in scripts, start it by its long
+  path (Git Bash: `cygpath -m -l`).

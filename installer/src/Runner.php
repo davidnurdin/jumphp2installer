@@ -186,6 +186,17 @@ final class Runner
         return true;
     }
 
+    /** "phar:///private/var/x/a.zip/dir/f" -> "dir/f", the archive being known as phar:///var/x/a.zip */
+    public static function insideArchive(string $path, string $base): string
+    {
+        if (str_starts_with($path, $base . '/')) {
+            return substr($path, strlen($base) + 1);
+        }
+        $name = '/' . basename($base) . '/';
+        $at = strpos($path, $name);
+        return $at === false ? ltrim(substr($path, 7), '/') : substr($path, $at + strlen($name));
+    }
+
     private function stepExtract(array $step, float $end): bool
     {
         $into = $this->vars->path($step['into']);
@@ -204,7 +215,10 @@ final class Runner
         while ($this->entries->valid()) {
             /** @var \PharFileInfo $entry */
             $entry = $this->entries->current();
-            $relative = ltrim(substr(str_replace('\\', '/', $entry->getPathname()), strlen($this->archiveBase)), '/');
+            // phar:// paths name the archive by its real path (/private/var on macOS, the long or short name on
+            // Windows): what follows the archive's own name is the entry's path in it
+            $path = str_replace('\\', '/', $entry->getPathname());
+            $relative = self::insideArchive($path, $this->archiveBase);
             $parts = array_values(array_filter(explode('/', $relative), static fn (string $p): bool => $p !== '' && $p !== '.'));
             if (in_array('..', $parts, true)) {
                 throw new \RuntimeException("the archive holds a path that goes up ($relative): refused");
