@@ -13,7 +13,7 @@
     <nav>
       {% if app.user %}
         <a href="{{ path('packages') }}">Packages</a>
-        <a href="https://github.com/davidnurdin/jumphp2installer/blob/main/docs/script.md" target="_blank" rel="noopener">Script reference</a>
+        <a href="https://github.com/davidnurdin/jumphp2installer/blob/main/docs/installer/script.md" target="_blank" rel="noopener">Script reference</a>
         <span class="muted">{{ app.user.email }}</span>
         <a href="{{ path('logout') }}">Sign out</a>
       {% else %}

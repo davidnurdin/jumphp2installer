@@ -14,7 +14,7 @@ use JumPHP2Installer\Script;
 class Package
 {
     public const DEFAULT_SCRIPT = <<<'YAML'
-        # The install script: docs/script.md. {app}, {version}, {folder}, {programs}, {platform}, {exe}... are variables.
+        # The install script: docs/installer/script.md. {app}, {version}, {folder}, {programs}, {platform}, {exe}... are variables.
         installer: 1
 
         app:

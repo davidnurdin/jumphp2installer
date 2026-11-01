@@ -17,7 +17,7 @@ use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * What installers and visitors reach, without an account (docs/api.md):
+ * What installers and visitors reach, without an account (docs/installer/server.md):
  *   GET /api/packages/{id}                 the package: {id, name, script, assets}
  *   GET /api/packages/{id}/assets/{path}   one of its files
  *   GET /download/{id}/{platform}          its installer (windows-x86_64, macos, linux-x86_64)
