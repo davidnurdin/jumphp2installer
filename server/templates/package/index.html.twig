@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+{% block title %}Packages · jumphp2installer{% endblock %}
+{% block body %}
+<div class="row-between">
+  <h1>Your packages</h1>
+  <form method="post" action="{{ path('package_new') }}" class="inline-form">
+    <input name="name" placeholder="Software name" required maxlength="120">
+    <input type="hidden" name="_token" value="{{ csrf_token('package') }}">
+    <button class="primary">New package</button>
+  </form>
+</div>
+{% if packages is empty %}
+  <p class="box">No package yet: give your software's name above. A package is an install script and its pictures; its
+    installers come from this server.</p>
+{% else %}
+<table class="list">
+  <thead><tr><th>Name</th><th>Id</th><th>State</th><th>Downloads</th><th>Changed</th></tr></thead>
+  <tbody>
+  {% for p in packages %}
+    <tr>
+      <td><a href="{{ path('package_edit', {id: p.id}) }}">{{ p.name }}</a></td>
+      <td><code>{{ p.id }}</code></td>
+      <td>{% if p.published %}<span class="tag ok">published</span>{% else %}<span class="tag">draft</span>{% endif %}</td>
+      <td>{{ p.downloads }}</td>
+      <td class="muted">{{ p.updatedAt|date('Y-m-d H:i') }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

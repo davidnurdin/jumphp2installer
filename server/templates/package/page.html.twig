@@ -1,0 +1,32 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ package.name }} · download{% endblock %}
+{% block body %}
+<section class="download box narrow">
+  {% if app.icon %}<img class="app-icon" src="{{ path('api_asset', {id: package.id, path: app.icon}) }}" alt="">{% endif %}
+  <h1>{{ package.name }}</h1>
+  {% if app.publisher %}<p class="muted">by {{ app.publisher }}{% if app.website %} · <a href="{{ app.website }}" rel="noopener">{{ app.website }}</a>{% endif %}</p>{% endif %}
+  {% if not package.published %}<p class="warn">Draft: only you see this page.</p>{% endif %}
+  <div id="downloads" class="downloads">
+    {% for platform, label in platforms %}
+      <a class="button {{ loop.first ? 'primary' }}" data-platform="{{ platform }}" href="{{ path('download', {id: package.id, platform: platform}) }}">Download for {{ label }}</a>
+    {% else %}
+      <p class="warn">No installer on this server yet.</p>
+    {% endfor %}
+  </div>
+  <p class="muted small">The installer downloads the newest version of {{ package.name }} and installs it, with an uninstaller.
+    Linux: <code>chmod +x</code> the file first. macOS: unzip it, then right click › Open the first time.</p>
+</section>
+<script>
+  // the visitor's system first
+  (() => {
+    const ua = navigator.userAgent;
+    const os = /Windows/.test(ua) ? 'windows-x86_64' : /Mac OS X/.test(ua) ? 'macos' : /Linux/.test(ua) && !/Android/.test(ua) ? 'linux-x86_64' : null;
+    const box = document.getElementById('downloads');
+    const mine = os && box.querySelector(`[data-platform="${os}"]`);
+    if (!mine) return;
+    box.querySelectorAll('a').forEach((a) => a.classList.remove('primary'));
+    mine.classList.add('primary');
+    box.prepend(mine);
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ package.name }} · jumphp2installer{% endblock %}
+{% block main_class %}editor-page{% endblock %}
+{% block body %}
+<div id="editor-app" class="editor-app"
+     data-check="{{ path('package_check', {id: package.id}) }}"
+     data-save="{{ path('package_save', {id: package.id}) }}"
+     data-draft="{{ path('package_draft', {id: package.id}) }}"
+     data-files="{{ path('package_files', {id: package.id}) }}"
+     data-remove="{{ path('package_file_remove', {id: package.id}) }}"
+     data-file="{{ path('package_file', {id: package.id, path: '__PATH__'}) }}"
+     data-preview="{{ path('package_preview', {id: package.id}) }}"
+     data-published="{{ package.published ? '1' : '0' }}">
+  <section class="pane script-pane">
+    <div class="pane-head">
+      <h1 id="package-name">{{ package.name }}</h1>
+      <code class="muted">{{ package.id }}</code>
+      <span class="grow"></span>
+      <span id="save-state" class="muted">saved</span>
+      <button id="save" class="primary" title="Ctrl+S">Save</button>
+    </div>
+    <div id="editor" class="code-editor"></div>
+    <textarea id="script" hidden>{{ package.script }}</textarea>
+    <div id="problems" class="problems">
+      {% for p in problems %}<div class="problem">{{ p }}</div>{% endfor %}
+    </div>
+  </section>
+  <aside class="pane side-pane">
+    <details open>
+      <summary>Preview</summary>
+      <div class="preview-bar">
+        <select id="preview-os"><option value="windows">Windows</option><option value="macos">macOS</option><option value="linux">Linux</option></select>
+        <button id="preview-reload" class="small">Refresh</button>
+      </div>
+      <div class="preview-frame"><iframe id="preview" title="The installer" src="about:blank"></iframe></div>
+    </details>
+    <details open>
+      <summary>Files <span class="muted">(pictures, license…: <code>banner.png</code> in the script)</span></summary>
+      <div id="drop" class="drop">Drop files here or <label class="link">choose<input id="file-input" type="file" multiple hidden></label></div>
+      <ul id="files" class="files">
+        {% for f in files %}<li data-path="{{ f.path }}"><code>{{ f.path }}</code> <span class="muted">{{ (f.size / 1024)|round(1) }} KB</span></li>{% endfor %}
+      </ul>
+      <p id="missing" class="warn"></p>
+    </details>
+    <details open>
+      <summary>Publish</summary>
+      <label class="inline"><input type="checkbox" id="published" {{ package.published ? 'checked' }}> Published: anyone with the links below can install it</label>
+      <ul class="links">
+        <li>Download page: <a href="{{ path('package_page', {id: package.id}) }}" target="_blank">{{ url('package_page', {id: package.id}) }}</a></li>
+        {% for platform, label in platforms %}
+          <li>{{ label }}: <a href="{{ path('download', {id: package.id, platform: platform}) }}">{{ url('download', {id: package.id, platform: platform}) }}</a></li>
+        {% else %}
+          <li class="warn">No base installer on this server yet: <code>bin/console app:installers:fetch</code></li>
+        {% endfor %}
+        <li>API: <a href="{{ path('api_package', {id: package.id}) }}" target="_blank"><code>/api/packages/{{ package.id }}</code></a></li>
+      </ul>
+      <p class="muted">Not published, only you can open these (signed in): try your installer before publishing it.</p>
+    </details>
+    <details>
+      <summary>Delete</summary>
+      <form method="post" action="{{ path('package_delete', {id: package.id}) }}" onsubmit="return confirm('Delete this package and its files? Installers already given will stop working.')">
+        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ package.id) }}">
+        <button class="danger">Delete the package</button>
+      </form>
+    </details>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+# the build context is the repository's root: only what the image needs
+*
+!server
+!installer/src
+!games/installer/ui
+server/vendor
+server/var
+server/lib
+server/public/installer-ui
+server/public/assets
+server/.env.local

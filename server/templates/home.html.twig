@@ -1,0 +1,28 @@
+{% extends 'base.html.twig' %}
+{% block body %}
+<section class="hero">
+  <h1>Installers for your software, from a readable script</h1>
+  <p class="lead">Write what to install in a few lines of YAML: where to download the newest version, the pictures and the
+    license to show, the folder, the shortcuts. Your users get one small executable (Windows, macOS, Linux) that installs
+    the newest version, with an uninstaller.</p>
+  <p><a class="button primary" href="{{ path('login') }}">Sign in</a>
+     <a class="button" href="https://github.com/davidnurdin/jumphp2installer" target="_blank" rel="noopener">The project</a></p>
+</section>
+<section class="cards">
+  <div class="card"><h2>A script anyone can read</h2>
+<pre class="code">app: {name: My App, banner: banner.png}
+version: {github: me/myapp}
+pages: [welcome, folder, install, finish]
+steps:
+  - download: https://github.com/me/myapp/releases/latest/download/myapp-{platform}.zip
+  - extract
+  - shortcut: {target: "{folder}/myapp{exe}"}
+  - uninstaller</pre></div>
+  <div class="card"><h2>One installer, its id in its name</h2><p>Each download is the same installer, with this
+    server's address and the package's id written in: <code>My-App-setup-k2q9x7a1.exe</code>. It always installs the
+    newest version: no installer to rebuild when you release.</p></div>
+  <div class="card"><h2>No server? GitHub</h2><p>The same package can live in your GitHub releases, installers included:
+    <code>tools/github-release.sh</code> or the <code>package</code> workflow.</p></div>
+</section>
+<p class="muted center">Installers on this server: {{ platforms ? platforms|join(', ') : 'none yet (bin/console app:installers:fetch)' }}</p>
+{% endblock %}

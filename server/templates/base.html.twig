@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}jumphp2installer{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%232f6fed'/><path d='M8 3v7M5 7l3 3 3-3M4 13h8' stroke='white' stroke-width='1.6' fill='none'/></svg>">
+  {% block importmap %}{{ importmap('app') }}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <header class="top">
+    <a class="brand" href="{{ path('home') }}"><span class="logo">⬇</span> jumphp2installer</a>
+    <nav>
+      {% if app.user %}
+        <a href="{{ path('packages') }}">Packages</a>
+        <a href="https://github.com/davidnurdin/jumphp2installer/blob/main/docs/script.md" target="_blank" rel="noopener">Script reference</a>
+        <span class="muted">{{ app.user.email }}</span>
+        <a href="{{ path('logout') }}">Sign out</a>
+      {% else %}
+        <a href="https://github.com/davidnurdin/jumphp2installer" target="_blank" rel="noopener">GitHub</a>
+        <a href="{{ path('login') }}">Sign in</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main class="{% block main_class %}page{% endblock %}">
+    {% block body %}{% endblock %}
+  </main>
+</body>
+</html>

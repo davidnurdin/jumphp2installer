@@ -1,0 +1,36 @@
+# jumphp2installer's server, with its database. From the repository's root:
+#   docker compose -f server/compose.yaml up -d --build
+#   docker compose -f server/compose.yaml exec app bin/console app:user:create you@example.com
+# then http://localhost:8095 (JUMPHP2INSTALLER_PORT). Behind a proxy with https: set JUMPHP2INSTALLER_PUBLIC_URL.
+name: jumphp2installer
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    depends_on: [database]
+    environment:
+      APP_SECRET: ${APP_SECRET:-}           # empty: made once and kept with the packages
+      DATABASE_URL: mysql://app:${DB_PASSWORD:-app}@database:3306/app?serverVersion=11.4.2-MariaDB&charset=utf8mb4
+      JUMPHP2INSTALLER_PUBLIC_URL: ${JUMPHP2INSTALLER_PUBLIC_URL:-}
+      JUMPHP2INSTALLER_FETCH: ${JUMPHP2INSTALLER_FETCH:-1}
+    ports:
+      - "${JUMPHP2INSTALLER_PORT:-8095}:80"
+    volumes:
+      - packages:/app/var/packages
+      - installers:/app/var/installers
+  database:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: app
+      MARIADB_USER: app
+      MARIADB_PASSWORD: ${DB_PASSWORD:-app}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    volumes:
+      - database:/var/lib/mysql
+volumes:
+  packages:
+  installers:
+  database:

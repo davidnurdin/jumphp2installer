@@ -69,6 +69,20 @@ final class Vars
         return $app !== [] ? $vars->withApp($app) : $vars;
     }
 
+    /** Example places of a computer of $os (the editor's preview: what a user of that system would see). */
+    public static function example(string $os = 'windows'): self
+    {
+        $values = match ($os) {
+            'windows' => ['home' => 'C:\\Users\\you', 'temp' => 'C:\\Users\\you\\AppData\\Local\\Temp', 'programs' => 'C:\\Users\\you\\AppData\\Local\\Programs',
+                'desktop' => 'C:\\Users\\you\\Desktop', 'menu' => 'C:\\Users\\you\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs', 'exe' => '.exe', 'arch' => 'x86_64'],
+            'macos' => ['home' => '/Users/you', 'temp' => '/tmp', 'programs' => '/Users/you/Applications', 'desktop' => '/Users/you/Desktop', 'menu' => '', 'exe' => '', 'arch' => 'arm64'],
+            default => ['home' => '/home/you', 'temp' => '/tmp', 'programs' => '/home/you/.local/opt', 'desktop' => '/home/you/Desktop',
+                'menu' => '/home/you/.local/share/applications', 'exe' => '', 'arch' => 'x86_64'],
+        };
+        $os = in_array($os, ['windows', 'macos'], true) ? $os : 'linux';
+        return new self(['os' => $os, 'platform' => $os . '-' . $values['arch']] + $values);
+    }
+
     /** {app} {id} {publisher} {website} of the script's app section. */
     public function withApp(array $app): self
     {

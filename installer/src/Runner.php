@@ -99,7 +99,7 @@ final class Runner
                 }
                 $step = $this->steps[$this->index];
                 if (!$this->started) {
-                    $this->label = $this->vars->expand((string)($step['label'] ?? $this->defaultLabel($step)));
+                    $this->label = self::label($step, $this->vars);
                     $this->log[] = $this->label;
                     $this->started = true;
                     $this->fraction = 0.0;
@@ -576,7 +576,13 @@ final class Runner
         throw new \RuntimeException("delete: $path is outside the install folder and the home folder: refused");
     }
 
-    private function defaultLabel(array $step): string
+    /** What the install page says while $step runs (its label:, else a sentence of its action). */
+    public static function label(array $step, Vars $vars): string
+    {
+        return $vars->expand((string)($step['label'] ?? self::defaultLabel($step)));
+    }
+
+    private static function defaultLabel(array $step): string
     {
         return match ($step['action']) {
             'download' => 'Downloading ' . basename((string)parse_url((string)$step['url'], PHP_URL_PATH)),
