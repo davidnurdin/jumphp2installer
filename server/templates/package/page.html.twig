@@ -2,9 +2,9 @@
 {% block title %}{{ package.name }} · download{% endblock %}
 {% block body %}
 <section class="download box narrow">
-  {% if app.icon %}<img class="app-icon" src="{{ path('api_asset', {id: package.id, path: app.icon}) }}" alt="">{% endif %}
+  {% if meta.icon %}<img class="app-icon" src="{{ path('api_asset', {id: package.id, path: meta.icon}) }}" alt="">{% endif %}
   <h1>{{ package.name }}</h1>
-  {% if app.publisher %}<p class="muted">by {{ app.publisher }}{% if app.website %} · <a href="{{ app.website }}" rel="noopener">{{ app.website }}</a>{% endif %}</p>{% endif %}
+  {% if meta.publisher %}<p class="muted">by {{ meta.publisher }}{% if meta.website %} · <a href="{{ meta.website }}" rel="noopener">{{ meta.website }}</a>{% endif %}</p>{% endif %}
   {% if not package.published %}<p class="warn">Draft: only you see this page.</p>{% endif %}
   <div id="downloads" class="downloads">
     {% for platform, label in platforms %}

@@ -82,7 +82,7 @@ final class ApiController extends AbstractController
     {
         $package = $this->visible($id);
         $script = \JumPHP2Installer\Script::parse($package->getScript())->toArray();
-        return $this->render('package/page.html.twig', ['package' => $package, 'app' => $script['app'] ?? [], 'platforms' => $installers->available()]);
+        return $this->render('package/page.html.twig', ['package' => $package, 'meta' => $script['app'] ?? [], 'platforms' => $installers->available()]);
     }
 
     private function visible(string $id): Package
