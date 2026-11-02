@@ -83,11 +83,11 @@ final class RunnerTest extends TestCase
     {
         $package = $this->package(self::SCRIPT);
         $runner = new Runner($package, $this->vars($package, ['desktop' => true, 'readme' => false]), "$this->root/temp/work", "$this->pkg/self.bin");
-        $frames = 0;
+        $until = microtime(true) + 60;     // a time limit, not a count of turns: a slow machine takes more of them
         $progress = [];
         while (!$runner->tick(2.0)) {
             $progress[] = $runner->progress();
-            self::assertLessThan(5000, ++$frames);
+            self::assertLessThan($until, microtime(true), 'the install never ends');
         }
         self::assertNull($runner->error, implode("\n", $runner->log));
         $folder = "$this->root/home/opt/Hello";
