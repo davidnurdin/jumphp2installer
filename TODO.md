@@ -87,6 +87,32 @@ later iOS).
 - in the long run: an IDE (a software, itself a JumPHP app) to develop every kind of app: the project, the code,
   run / test / package for each system, Claude inside
 
+## JumPHP IDE: the next features
+
+- a real-time debugger based on Xdebug: breakpoints in the editor's gutter, step over / into / out, the call stack,
+  variables and watches, evaluating expressions, while the game runs (Xdebug in the desktop image, its DBGp
+  connection to the IDE; the browser version and remote games later)
+- plugins to extend the IDE: a plugin API (tool windows, actions and menus, run configurations, editor features,
+  PHP side and interface side), plugins developed and tested like any JumPHP project, and a plugin marketplace on
+  jumphp.net (publish, versions, install / update / remove from the IDE)
+- editors for a game's resources, inside the IDE: sprites (sheets, animations, palettes), music, sound effects (and
+  tiles / levels): see how the Sonic project does it (github.com/davidnurdin/sonicGameSite: public/js/editor-sprites.js,
+  editor-music.js, editor-sfx.js, editor-tiles.js, editor-level.js, templates/editor/), made into IDE tool windows / editor
+  tabs that read and write the game's assets/
+- AI generation from these editors: for each kind (pictures, music, sound effects...) the online AIs that do it best
+  (Claude among them), the user giving their own token / API key in the editor, then "generate" a sprite, a tune, an
+  effect from a description, straight into the game's assets (a provider per service, the keys kept on the user's
+  computer, never in the project)
+
+## A "CLI app" template: full terminal applications (TUI)
+
+- a new kind of project beside games, desktop apps and graphic apps: `bin/jumphp cli:new <id>` from a
+  `skeleton-cli/`, an application that lives in the terminal (commands, and full-screen text interfaces: lists,
+  forms, tables, progress, keyboard and mouse), ideally built on symfony/tui (Fabien Potencier's TUI component)
+- run / test (its PHPUnit tests, a headless terminal for the screens) / export: one executable per system that
+  KEEPS its console (Windows exports are GUI programs since 0.1.6: `JUMPHP_STANDALONE_CONSOLE=1`, to make a
+  game.yaml / kind setting), a project type in the IDE's New Project, docs and an example in games/
+
 ## Cleaning
 
 - the GitHub pre-release `standalone-1460857eb89286a9`: its Linux micro needs AVX-512 (built for GitHub's

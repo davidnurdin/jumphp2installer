@@ -14,6 +14,7 @@ final class ProjectInfo
     public const KINDS = [
         'game' => 'Game',
         'app' => 'Desktop app (HTML + PHP)',
+        'gui' => 'Graphic app (forms, no HTML)',
         'hybrid' => 'Hybrid game (SDL + HTML windows)',
         'cpc' => 'Amstrad CPC remake',
         'port' => 'Port of an open-source game',
@@ -35,8 +36,12 @@ final class ProjectInfo
                 $modules[] = $this->module($m[1], "games/{$m[1]}");
             }
         }
-        if (!$jumphp && $this->workspace->exists('config/game.yaml')) {
-            $modules[] = $this->module($this->workspace->name(), '');
+        $linked = !$jumphp && $this->workspace->exists('config/game.yaml');
+        if ($linked) {
+            // a game in its own repository (composer.json -> ../../engine): run through the IDE's copy of JumPHP
+            $id = preg_match('/^\s*id:\s*["\']?([a-z0-9][a-z0-9-]*)/m', $this->workspace->read('config/game.yaml'), $m) ? $m[1]
+                : (trim((string)preg_replace('/[^a-z0-9]+/', '-', strtolower($this->workspace->name())), '-') ?: 'game');
+            $modules[] = $this->module($id, '');
         }
         $version = $this->workspace->exists('VERSION') ? trim($this->workspace->read('VERSION')) : null;
         return [
@@ -46,7 +51,8 @@ final class ProjectInfo
             'modules' => $modules,
             'kind' => $modules[0]['kind'] ?? ($this->workspace->exists('composer.json') ? 'php' : 'php'),
             'composer' => $this->workspace->exists('composer.json'),
-            'run' => $this->runConfigurations($jumphp, $modules),
+            'linked' => $linked,
+            'run' => $linked ? self::linkedConfigurations($this->runConfigurations(true, $modules)) : $this->runConfigurations($jumphp, $modules),
         ];
     }
 
@@ -57,7 +63,7 @@ final class ProjectInfo
         $yaml = $this->workspace->read($prefix . 'config/game.yaml');
         $get = fn (string $key) => preg_match('/^\s*' . $key . ':\s*["\']?([^"\'#\n]*?)["\']?\s*(?:#.*)?$/m', $yaml, $m) ? trim($m[1]) : null;
         $ui = $get('ui');
-        $kind = $ui === 'webview' ? 'app' : ($ui === 'hybrid' ? 'hybrid' : 'game');
+        $kind = $ui === 'webview' ? 'app' : ($ui === 'hybrid' ? 'hybrid' : ($get('kind') === 'gui' ? 'gui' : 'game'));
         $brief = $this->workspace->exists($prefix . 'BRIEF.md') ? $this->workspace->read($prefix . 'BRIEF.md') : '';
         if ($kind === 'game' && preg_match('/\b(amstrad|cpc|\.dsk|dsk2jumphp)\b/i', $brief)) {
             $kind = 'cpc';
@@ -71,6 +77,7 @@ final class ProjectInfo
         return [
             'id' => $id, 'dir' => $dir, 'title' => $get('title') ?? $id, 'kind' => $kind, 'kindLabel' => self::KINDS[$kind],
             'startScene' => $get('start_scene'), 'width' => (int)($get('width') ?? 320), 'height' => (int)($get('height') ?? 180),
+            'forms' => $kind === 'gui' ? array_values(array_filter(array_keys($this->workspace->files()), fn ($p) => str_starts_with($p, $prefix . 'forms/') && str_ends_with($p, '.form.yaml'))) : null,
             'pages' => $pages, 'site' => $this->workspace->exists($prefix . 'site/index.html') ? $prefix . 'site' : null,
             'hasTests' => (bool)array_filter(array_keys($this->workspace->files()), fn ($p) => str_starts_with($p, $prefix . 'tests/') && str_ends_with($p, 'Test.php')),
         ];
@@ -98,8 +105,18 @@ final class ProjectInfo
                     $configs[] = ['id' => "webshot:$id", 'label' => "Browser check $id", 'group' => $id, 'icon' => 'globe', 'command' => ['bin/jumphp', 'webshot', $id, '6', '[[1,"Enter"]]'], 'kind' => 'webshot'];
                     $configs[] = ['id' => "serve:$id", 'label' => "Serve $id on localhost:8080", 'group' => $id, 'icon' => 'globe', 'command' => ['bin/jumphp', 'serve', $id], 'kind' => 'serve', 'url' => 'http://localhost:8080'];
                     $configs[] = ['id' => "standalone:$id", 'label' => "Executable of $id (Linux)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'export:standalone', $id], 'kind' => 'build'];
+                    $configs[] = ['id' => "standalone-windows:$id", 'label' => "Executable of $id (Windows)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'export:standalone', $id, '--windows'], 'kind' => 'build'];
+                    $configs[] = ['id' => "macos:$id", 'label' => "Mac app of $id (built on GitHub)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'macos', $id], 'kind' => 'build'];
+                    $configs[] = ['id' => "ios:$id", 'label' => "iPhone / iPad app of $id (built on GitHub)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'ios', $id], 'kind' => 'build'];
+                    $configs[] = ['id' => "android:$id", 'label' => "Android app of $id (built on GitHub)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'android', $id], 'kind' => 'build'];
+                    $configs[] = ['id' => "android-local:$id", 'label' => "Android app of $id (built here)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'android', $id, '--local'], 'kind' => 'build'];
+                    if (!$m['site']) {
+                        $configs[] = ['id' => "site-new:$id", 'label' => "Make the web site of $id", 'group' => $id, 'icon' => 'globe', 'command' => ['bin/jumphp', 'site:new', $id], 'kind' => 'build'];
+                    }
                 } else {
                     $configs[] = ['id' => "export:$id", 'label' => "Executable of $id (Linux)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'app:export', $id], 'kind' => 'build'];
+                    $configs[] = ['id' => "export-windows:$id", 'label' => "Executable of $id (Windows)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'app:export', $id, '--windows'], 'kind' => 'build'];
+                    $configs[] = ['id' => "export-macos:$id", 'label' => "Mac app of $id", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'app:export', $id, '--macos'], 'kind' => 'build'];
                 }
                 $configs[] = ['id' => "install:$id", 'label' => "composer install ($id)", 'group' => $id, 'icon' => 'package', 'command' => ['bin/jumphp', 'install', $id], 'kind' => 'tool'];
                 if ($m['site']) {
@@ -122,6 +139,28 @@ final class ProjectInfo
             $configs[] = $custom + ['id' => "custom:$i", 'group' => 'Custom', 'icon' => 'play', 'kind' => 'tool'];
         }
         return $configs;
+    }
+
+    /**
+     * A game in its own repository: the commands of a JumPHP project, run by the IDE's copy of JumPHP (Runner: `@jumphp`
+     * = its bin/jumphp, the game linked into its games/). What only a whole JumPHP project has is left out.
+     *
+     * @param list<array<string, mixed>> $configs
+     * @return list<array<string, mixed>>
+     */
+    public static function linkedConfigurations(array $configs): array
+    {
+        $out = [];
+        foreach ($configs as $c) {
+            if (in_array($c['id'], ['lint', 'test:engine', 'update'], true) || str_starts_with((string)$c['id'], 'custom:')) {
+                continue;
+            }
+            $c['command'] = array_map(fn (string $arg) => str_replace('bin/jumphp', '@jumphp', $arg), $c['command']);
+            $c['game'] = $c['group'];
+            $out[] = $c;
+        }
+        $out[] = ['id' => 'update', 'label' => 'Update JumPHP (the IDE\'s copy)', 'group' => 'Project', 'icon' => 'download', 'command' => ['@jumphp-update'], 'kind' => 'tool'];
+        return $out;
     }
 
     /** Run configurations the user added (.jumphp/run.json: [{label, command: [...]}]). @return list<array<string, mixed>> */

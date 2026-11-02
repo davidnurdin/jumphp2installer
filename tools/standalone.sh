@@ -42,6 +42,12 @@ if [ ! -s "$micro" ] && [ -z "${JUMPHP_STANDALONE_BUILD:-}" ]; then
   say "PHP for $TARGET: $release"
   curl -fsSL -A jumphp-standalone -o "$micro.part" "$release" && mv "$micro.part" "$micro" || rm -f "$micro.part"
 fi
+if [ ! -s "$micro" ] && [ "$TARGET" = linux-x86_64 ]; then
+  # one StaticPHP build at a time in a work folder: two exports at once (the IDE and a terminal) would write the
+  # same php-src and break each other; the second one waits, then finds the micro the first one made
+  mkdir -p "$SPC" && exec 9>"$SPC.lock"
+  flock -n 9 || { say "another build of PHP is running in ~/.jumphp/standalone/${JUMPHP_STANDALONE_SPC:-spc}: waiting for it"; flock 9; }
+fi
 if [ ! -s "$micro" ]; then
   [ "$TARGET" = linux-x86_64 ] || die "no PHP for $TARGET (standalone-$key) on JumPHP's GitHub releases: it is built on Windows / macOS by the workflow .github/workflows/standalone.yml (Actions > standalone > Run workflow), see docs/standalone.md"
   say "PHP $PHP_VERSION with $(cat "$EXTENSIONS"), built here (StaticPHP: ~15 min the first time, then kept)"
@@ -96,4 +102,16 @@ if [ -n "$INI" ]; then
 fi
 cat "$micro" "$ini" /tmp/stage/game.phar > "$OUT/$FILE"
 chmod 755 "$OUT/$FILE"
+# Windows: a GUI program (SUBSYSTEM:WINDOWS in its PE header, as editbin does), not a console one: no console window
+# beside the game / app / installer. The programs it starts get no window either (registry/src/Patch/WindowsGui.php).
+# Nothing moves in the file (two bytes). JUMPHP_STANDALONE_CONSOLE=1 keeps the console (a command-line tool).
+if [ "$TARGET" = windows-x86_64 ] && [ -z "${JUMPHP_STANDALONE_CONSOLE:-}" ]; then
+  php -r '
+    $f = fopen($argv[1], "r+b");
+    fseek($f, 0x3c); $pe = unpack("V", fread($f, 4))[1];
+    fseek($f, $pe); if (fread($f, 4) !== "PE\0\0") { fwrite(STDERR, "not a PE executable\n"); exit(1); }
+    fseek($f, $pe + 24 + 68); fwrite($f, pack("v", 2));    // optional header: Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI
+    fclose($f);
+  ' "$OUT/$FILE" || die "could not make $FILE a GUI program"
+fi
 echo "OUT=$OUT/$FILE"

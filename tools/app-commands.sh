@@ -22,7 +22,7 @@ tauri_run() {
   ensure_tauri_image
   mkdir -p "$TAURI_HOME/cargo" "$TAURI_HOME/target"
   docker run --rm $TTY_FLAGS --user "$(id -u):$(id -g)" \
-    -v "$ROOT:/workspace" -w "/workspace/$wd" \
+    "${WS[@]}" -w "/workspace/$wd" \
     -v "$TAURI_HOME/cargo:/opt/jumphp-cargo" -v "$TAURI_HOME/target:/opt/jumphp-target" \
     -e HOME=/tmp -e XDG_RUNTIME_DIR=/tmp -e COMPOSER_HOME=/tmp/composer -e COMPOSER_CACHE_DIR=/workspace/.cache/composer \
     -e CARGO_HOME=/opt/jumphp-cargo -e CARGO_TARGET_DIR=/opt/jumphp-target \
@@ -75,6 +75,7 @@ cmd_tauri_download() {
       mv "$out.part" "$out"
       [ "$p" = linux-x86_64 ] || [ "$p" = macos-universal ] && chmod 755 "$out"
       touch "$out"
+      echo "$key" > "$(dirname "$out")/.key"    # the sources it was built from (tauri_lib_current)
       say "tauri-$key: build/tauri/$p/$file"
     else
       rm -f "$out.part"
@@ -83,6 +84,17 @@ cmd_tauri_download() {
     fi
   done
   return $status
+}
+
+# the Windows / macOS library (they can not be built here) of THESE sources of tauri/: downloaded again when it is
+# missing or came from other sources (a library of older sources lacks functions TauriRuntime declares: the exported
+# app does not start, "Failed resolving C function"); fails rather than packing a stale one
+ensure_tauri_platform_lib() {
+  local p="$1" asset file
+  read -r asset file <<<"$(tauri_asset "$p")"
+  if [ -f "$ROOT/build/tauri/$p/$file" ] && [ "$(cat "$ROOT/build/tauri/$p/.key" 2>/dev/null)" = "$(tauri_key)" ]; then return 0; fi
+  cmd_tauri_download "$p" \
+    || die "no $p library for these sources of tauri/ (tauri-$(tauri_key)): run the GitHub workflow tauri (Actions > tauri), then again"
 }
 
 # the library, downloaded (the release of these sources) or built, when missing or older than its sources
@@ -150,6 +162,7 @@ cmd_app_run() {
 cmd_app_test() {
   local dir; dir="$(app_dir "${1:-}")"
   ensure_vendor "$dir"
+  [ -d "$ROOT/$dir/tests" ] && ensure_engine_tools
   live_announce
   say "$dir: php -l"
   php_run "$dir" -- sh -c 'find src app.php -name "*.php" -print0 | xargs -0 -n1 php -l >/dev/null'
@@ -204,8 +217,7 @@ cmd_app_export() {
       lib="$TAURI_LIB"
     else
       lib="build/tauri/windows-x86_64/jumphp_tauri.dll"
-      [ -f "$ROOT/$lib" ] || cmd_tauri_download windows-x86_64 \
-        || die "no Windows library for these sources of tauri/: run the GitHub workflow tauri (Actions > tauri), then again"
+      ensure_tauri_platform_lib windows-x86_64
     fi
     JUMPHP_STANDALONE_EXTENSIONS=tools/app-extensions.txt JUMPHP_STANDALONE_SPC=spc-app \
     JUMPHP_STANDALONE_BOOT='JumPHP\Tauri\App' JUMPHP_STANDALONE_NATIVE="$lib" \
@@ -220,8 +232,7 @@ cmd_app_export() {
 # app:export --macos: <app>-macos.zip holding <Title>.app (Apple silicon + Intel executables, the universal library)
 app_export_macos() {
   local app="$1" dir="$2" lib="build/tauri/macos-universal/libjumphp_tauri.dylib" arch
-  [ -f "$ROOT/$lib" ] || cmd_tauri_download macos-universal \
-    || die "no macOS library for these sources of tauri/: run the GitHub workflow tauri (Actions > tauri), then again"
+  ensure_tauri_platform_lib macos-universal
   for arch in arm64 x86_64; do
     JUMPHP_STANDALONE_EXTENSIONS=tools/app-extensions.txt JUMPHP_STANDALONE_SPC=spc-app \
     JUMPHP_STANDALONE_BOOT='JumPHP\Tauri\App' JUMPHP_STANDALONE_NATIVE="$lib" JUMPHP_STANDALONE_NATIVE_DIR=macos-universal \
@@ -229,7 +240,7 @@ app_export_macos() {
       cmd_export_standalone "$app" "--macos-$arch"
   done
   local out="games/$app/dist/standalone"
-  docker run --rm --user "$(id -u):$(id -g)" -v "$ROOT:/workspace" -w /workspace "$DESKTOP_IMAGE" \
+  docker run --rm --user "$(id -u):$(id -g)" "${WS[@]}" -w /workspace "$DESKTOP_IMAGE" \
     php tools/macos-app.php "games/$app" "$out/$app-macos-arm64" "$out/$app-macos-x86_64" "$out/$app-macos.zip" >/dev/null \
     || die "the .app was not made (see above)"
   # the two executables stay beside it: app:release offers them as updates of the .app (each Mac replaces its own)
@@ -260,7 +271,7 @@ cmd_app_release() {
   # of executables), then the executables, then the signed list of them
   if [ ! -f "$ROOT/$dir/config/update.pub" ]; then
     mkdir -p "$ROOT/$dir/dist/standalone"
-    docker run --rm --user "$(id -u):$(id -g)" -v "$ROOT:/workspace" -v "$keys:/keys" -w /workspace "$DESKTOP_IMAGE" \
+    docker run --rm --user "$(id -u):$(id -g)" "${WS[@]}" -v "$keys:/keys" -w /workspace "$DESKTOP_IMAGE" \
       php tools/app-release.php "$dir" "/keys/$id-update.pem" "$base" "$notes" >/dev/null 2>&1 || true
     [ -f "$ROOT/$dir/config/update.pub" ] || die "no key made (see tools/app-release.php)"
   fi
@@ -275,7 +286,7 @@ cmd_app_release() {
       --macos) platforms+=",macos-arm64,macos-x86_64" ;;
     esac
   done
-  docker run --rm --user "$(id -u):$(id -g)" -v "$ROOT:/workspace" -v "$keys:/keys" -w /workspace "$DESKTOP_IMAGE" \
+  docker run --rm --user "$(id -u):$(id -g)" "${WS[@]}" -v "$keys:/keys" -w /workspace "$DESKTOP_IMAGE" \
     php tools/app-release.php "$dir" "/keys/$id-update.pem" "$base" "$notes" "${platforms#,}" || die "update.json not written"
   say "done: $dir/dist/standalone/update.json: upload dist/standalone/ to $base"
   echo "  The app checks it when game.yaml has  app: {update: {url: $base/update.json}}  (\$app->updater()->check())." >&2

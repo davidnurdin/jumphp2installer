@@ -2,10 +2,13 @@
 
 namespace JumPHP\Ide;
 
+use JumPHP\Ide\Agent\IdeAgent;
 use JumPHP\Ide\Async\Deferred;
 use JumPHP\Ide\Async\Processes;
 use JumPHP\Ide\Claude\ClaudeCode;
 use JumPHP\Ide\Git\Git;
+use JumPHP\Ide\Gui\FormCode;
+use JumPHP\Ide\Gui\FormFile;
 use JumPHP\Ide\Php\Index;
 use JumPHP\Ide\Php\Intelligence;
 use JumPHP\Ide\Php\Source;
@@ -45,6 +48,9 @@ final class Ide
     /** the Claude Code of this computer (desktop only) */
     public ?ClaudeCode $claude = null;
 
+    /** the IDE's tools for that Claude (an MCP server; the interface carries them out) */
+    public ?IdeAgent $agent = null;
+
     /** @var array<string, mixed> capabilities a host sets (they win over the defaults of project.info) */
     public array $capabilities = [];
 
@@ -67,7 +73,8 @@ final class Ide
         if ($root !== null) {
             // the extensions' functions (SDL, OpenGL, OpenAL...) from the engine's stubs, of the project or of a game's vendor/
             $stubs = [];
-            foreach ([...(glob("$root/engine/stubs/*.php") ?: []), ...(glob("$root/games/*/vendor/jumphp/engine/stubs/*.php") ?: [])] as $file) {
+            foreach ([...(glob("$root/engine/stubs/*.php") ?: []), ...(glob("$root/games/*/vendor/jumphp/engine/stubs/*.php") ?: []),
+                ...(glob("$root/vendor/jumphp/engine/stubs/*.php") ?: [])] as $file) {
                 $stubs[(string)realpath($file)] = true;
             }
             $this->index->addStubs(...array_keys($stubs));
@@ -75,6 +82,7 @@ final class Ide
             $this->runner = new Runner($this->processes, $root, fn (string $event, array $payload) => ($this->emit)($event, $payload));
         }
         $this->registerCore();
+        $this->registerForms();
         if ($this->git !== null) {
             $this->registerGit();
         }
@@ -82,10 +90,14 @@ final class Ide
             $this->registerRun();
         }
         if ($root !== null) {
-            $this->claude = new ClaudeCode($this->processes, $root, fn (string $event, array $payload) => ($this->emit)($event, $payload));
+            $this->agent = new IdeAgent(fn (string $event, array $payload) => ($this->emit)($event, $payload));
+            $this->register('agent.reply', fn (array $p) => $this->agent->reply((int)($p['call'] ?? 0), $p['result'] ?? null,
+                isset($p['error']) && $p['error'] !== '' ? (string)$p['error'] : null));
+            $this->claude = new ClaudeCode($this->processes, $root, fn (string $event, array $payload) => ($this->emit)($event, $payload), $this->agent);
             $this->register('claude.status', fn () => $this->claude->status());
             $this->register('claude.send', fn (array $p) => $this->claude->send((string)($p['prompt'] ?? ''), isset($p['session']) ? (string)$p['session'] : null,
-                (string)($p['mode'] ?? 'acceptEdits'), isset($p['model']) && $p['model'] !== '' ? (string)$p['model'] : null));
+                (string)($p['mode'] ?? 'acceptEdits'), isset($p['model']) && $p['model'] !== '' ? (string)$p['model'] : null,
+                isset($p['effort']) && $p['effort'] !== '' ? (string)$p['effort'] : null, true));
             $this->register('claude.stop', fn (array $p) => $this->claude->stop((int)($p['id'] ?? 0)));
         }
     }
@@ -136,6 +148,8 @@ final class Ide
     public function tick(float $budget = 0.008): void
     {
         $this->processes->poll();
+        $this->agent?->tick();
+        $this->claude?->tick();
         if (!$this->indexed) {
             $done = $this->index->refresh($budget);
             $this->emit('index.progress', $this->index->progress() + ['complete' => $done]);
@@ -148,6 +162,70 @@ final class Ide
     {
         $this->index->invalidate();
         $this->indexed = false;
+    }
+
+    /** The visual editor of forms (graphic PHP apps, JumPHP\Gui): form files <-> arrays, the code behind them. */
+    private function registerForms(): void
+    {
+        // the form also travels as a JSON string: the order of its keys is the file's (a host's JSON may sort objects' keys)
+        $this->register('gui.read', function (array $p) {
+            $parsed = FormFile::parse(isset($p['text']) ? (string)$p['text'] : $this->workspace->read(Paths::clean((string)($p['path'] ?? ''))));
+            return $parsed + ['json' => json_encode((object)$parsed['form'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION)];
+        });
+        $this->register('gui.dump', function (array $p) {
+            $form = isset($p['json']) ? json_decode((string)$p['json'], true, 64, JSON_THROW_ON_ERROR) : ($p['form'] ?? []);
+            return ['content' => FormFile::dump(is_array($form) ? $form : [], (string)($p['header'] ?? ''))];
+        });
+        // the form's class with a new event method and/or its @property lines: {path (the form file), wire?: {id, type, event,
+        // method?}, widgets?: {id: type}} -> {path, content, line, added, created} (the interface writes it: open editors follow)
+        $this->register('gui.code', function (array $p) {
+            [$path, $created] = $this->formClassFile(Paths::clean((string)($p['path'] ?? '')));
+            $content = $created ? FormCode::newClass(Templates::namespaceOf($path, $this->workspace), pathinfo($path, PATHINFO_FILENAME)) : $this->workspace->read($path);
+            $line = null;
+            $added = false;
+            if (isset($p['widgets']) && is_array($p['widgets'])) {
+                $widgets = [];
+                // [[id, type], ...] in the form's order (an object's keys may come sorted through a host's JSON)
+                foreach ($p['widgets'] as $id => $type) {
+                    if (is_array($type)) {
+                        [$id, $type] = array_values($type) + [null, 'container'];
+                    }
+                    if (preg_match('/^[A-Za-z_]\w*$/', (string)$id)) {
+                        $widgets[(string)$id] = FormCode::classOf((string)$type);
+                    }
+                }
+                $content = FormCode::properties($content, $widgets);
+            }
+            if (!empty($p['wire']) && is_array($p['wire'])) {
+                $w = $p['wire'];
+                $event = (string)($w['event'] ?? 'click');
+                $method = (string)($w['method'] ?? FormCode::handlerName((string)($w['id'] ?? 'form'), $event));
+                if (!preg_match('/^[A-Za-z_]\w*$/', $method)) {
+                    throw new \InvalidArgumentException("$method is not a method name");
+                }
+                ['content' => $content, 'line' => $line, 'added' => $added] = FormCode::wire($content, $method, FormCode::classOf((string)($w['type'] ?? '')), $event);
+            }
+            return ['path' => $path, 'content' => $content, 'line' => $line, 'added' => $added, 'created' => $created];
+        });
+    }
+
+    /**
+     * The class of a form file: games/x/forms/MainForm.form.yaml -> the file of class MainForm under games/x/src/
+     * (src/Form/MainForm.php when there is none yet).
+     *
+     * @return array{0: string, 1: bool} its path, whether it has to be created
+     */
+    private function formClassFile(string $form): array
+    {
+        $class = preg_replace('/\.form\.ya?ml$/', '', basename($form)) ?: 'MainForm';
+        $app = preg_match('#^(.*?)/?forms/#', $form, $m) ? $m[1] : dirname($form);
+        $src = ($app === '' || $app === '.' ? '' : "$app/") . 'src/';
+        foreach (array_keys($this->workspace->files()) as $file) {
+            if (str_starts_with($file, $src) && basename($file) === "$class.php") {
+                return [$file, false];
+            }
+        }
+        return ["{$src}Form/$class.php", true];
     }
 
     private function registerCore(): void
@@ -271,7 +349,10 @@ final class Ide
         if (str_starts_with($path, '/')) {
             // a library file outside the project (go to definition into vendor/): read only, PHP only
             $real = realpath($path);
-            $library = $real !== false && array_filter([...$this->libraryDirs, ...(($root = $this->workspace->localPath()) !== null ? [(string)realpath("$root/engine")] : [])],
+            // the libraries added, the engine of the repository, and the ones the index found outside the project
+            // (a game whose vendor/jumphp/engine links to the JumPHP checkout: External Libraries)
+            $found = array_map(fn (array $l) => (string)realpath($l['dir']), array_filter($this->index->libraries(), fn (array $l) => $l['external']));
+            $library = $real !== false && array_filter([...$this->libraryDirs, ...$found, ...(($root = $this->workspace->localPath()) !== null ? [(string)realpath("$root/engine")] : [])],
                 fn (string $dir) => $dir !== '' && str_starts_with($real, $dir . '/'));
             if ($real === false || !str_ends_with($real, '.php') || (!str_contains($real, '/vendor/') && !$library)) {
                 throw new WorkspaceException("cannot open $path");
@@ -326,6 +407,12 @@ final class Ide
         $this->register('git.remotes', fn () => $git->remotes());
         $this->register('git.stash', fn (array $p) => $after($git->stash($p['message'] ?? null)));
         $this->register('git.stashPop', fn () => $after($git->stashPop()));
+    }
+
+    /** Where the IDE keeps its copy of JumPHP, for the games kept in their own repository (Runner::linkedCommand()). */
+    public function setToolkit(string $dir, ?string $repo = null): void
+    {
+        $this->runner?->setToolkit($dir, $repo);
     }
 
     private function registerRun(): void

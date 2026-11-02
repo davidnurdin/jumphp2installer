@@ -105,7 +105,8 @@ class Engine extends EventEmitter
         $this->actions->load($c->file('input.yaml')['actions'] ?? []);
         $this->input->on('quit', fn () => $this->quit());
         $this->input->on('key', fn (int $key) => $this->globalKey($key));
-        if (!Platform::isWasm() && Platform::setting('JUMPHP_TOUCH_CONTROLS')) {
+        if (!Platform::isWasm() && Platform::setting('JUMPHP_TOUCH_CONTROLS') && $c->get('touch') !== false) {
+            // (touch: false: an app of forms, JumPHP\Gui, touched directly)
             // the native Android / iOS app: the on-screen controls of the browser version (engine/web/touch.js), drawn here
             $controls = new \JumPHP\Input\TouchControls($this->input->getKeyboard(), $this->input->getMouse(), $this->input,
                 (array)$c->get('touch', []), $this->font());
@@ -178,6 +179,13 @@ class Engine extends EventEmitter
         $renderer = $this->sdl->getRenderer();
         $this->bridge->poll();
         $this->input->poll($renderer);
+        if ($this->config->get('view') === 'window') {
+            // apps (JumPHP\Gui): the view is the window, pixel for pixel, whatever its size
+            [$ow, $oh] = $renderer->outputSize();
+            if ($ow > 0 && $oh > 0 && ($ow !== $renderer->getWidth() || $oh !== $renderer->getHeight())) {
+                $renderer->resizeView($ow, $oh);
+            }
+        }
         if ($this->net !== null && $this->net->isActive()) {
             $this->net->poll();
         }

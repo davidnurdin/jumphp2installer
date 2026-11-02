@@ -10,6 +10,8 @@ import { Git } from './git.js';
 import { Runner, Problems, Structure, Hierarchy } from './run.js';
 import { Welcome } from './welcome.js';
 import { GamePanel } from './game.js';
+import { PublishPanel } from './publish.js';
+import { createInstaller } from './installer.js';
 import { ClaudePanel } from './claude.js';
 
 const $ = (id) => document.getElementById(id);
@@ -50,6 +52,10 @@ class App {
     backend.on('bridge.status', (st) => this.bridgeStatus(st));
     if (backend.kind === 'native') backend.invoke('bridge.status').then((st) => this.bridgeStatus(st)).catch(() => null);
     if (backend.kind === 'native') {
+      backend.on('update.state', (st) => this.updateState(st));
+      backend.invoke('update.state').then((st) => this.updateState(st)).catch(() => null);
+    }
+    if (backend.kind === 'native') {
       const state = await backend.invoke('session.state');
       this.session = state;
       if (state.project) await this.projectOpened(state.project, false);
@@ -85,6 +91,7 @@ class App {
     this.find = new FindPanel(this);
     if (this.project.capabilities?.preview) this.game = new GamePanel(this);
     if (this.project.capabilities?.claude) this.claude = new ClaudePanel(this);
+    if (backend.kind === 'native' && this.project.playground) this.publishPanel = new PublishPanel(this);
     this.console = { append: (source, text) => { if (this.gitConsole) this.gitConsole.textContent += text; } };
     this.registerTools();
     this.registerActions();
@@ -113,6 +120,7 @@ class App {
     T('problems', 'bottom', 'Problems', 'problems', this.problems, 'Alt+6');
     if (this.game) T('game', prefs.get('gameSide', 'right'), 'Game', 'game', this.game, 'Alt+5');
     if (this.claude) T('claude', 'right', 'Claude', 'claude', this.claude, 'Alt+8');
+    if (this.publishPanel) T('publish', 'right', 'jumphp.net', 'globe', this.publishPanel, 'Alt+J');
     if (caps.log) T('git', 'bottom', 'Git', 'log', { title: () => 'Git', node: this.git.logNode, actions: () => [el('button', { title: 'Refresh', onclick: () => this.git.showLog() }, icon('refresh'))] }, 'Alt+9');
   }
 
@@ -197,6 +205,7 @@ class App {
     if (id === 'hierarchy') this.hierarchy.update();
     if (id === 'git' && !this.git.logNode.firstChild) this.git.showLog();
     if (id === 'problems') this.problems.render();
+    view.shown?.();
     if (!quiet && id === 'project') this.tree.node.focus();
     this.editors?.layout();
   }
@@ -398,6 +407,7 @@ class App {
       a.add('stop', 'Stop', () => this.runner.stop(), { kbd: 'Ctrl+F2', icon: 'stop' });
       a.add('runTool', 'Run Tool Window', () => this.toggleTool('run'), { kbd: 'Alt+4', icon: 'play' });
       a.add('runConfigs', 'Run Configurations…', () => this.runner.choose($('runConfig')), { kbd: 'Alt+Shift+F10' });
+      if (backend.kind === 'native') a.add('createInstaller', 'Create an Installer…', () => createInstaller(this), { icon: 'package' });
     } else if (caps.tests) {
       a.add('test', 'Run Tests on jumphp.net', () => this.runner.remoteTests(), { kbd: 'Ctrl+Shift+F10', icon: 'test' });
       a.add('runTool', 'Run Tool Window', () => this.toggleTool('run'), { kbd: 'Alt+4', icon: 'play' });
@@ -457,7 +467,7 @@ class App {
       const a = this.actions.items.get(id);
       return a ? { label: a.label, kbd: a.kbd ? kbd(a.kbd) : '', icon: a.icon, action: () => this.actions.run(id), ...extra } : null;
     };
-    const section = (label, ids) => ({ label, items: ids.map((id) => (id === '-' ? '-' : item(id))).filter(Boolean) });
+    const section = (label, ids) => ({ label, items: ids.map((id) => (id === '-' ? '-' : item(id))).filter(Boolean).filter((x, i, all) => x !== '-' || (i > 0 && i < all.length - 1 && all[i - 1] !== '-')) });
     menu([
       section('File', ['newFile', 'openProject', 'saveAll', 'closeTab', '-', 'settings', 'closeProject']),
       section('Edit', ['find', 'replace', 'findInFiles', 'replaceInFiles', 'comment']),
@@ -465,12 +475,16 @@ class App {
       section('Navigate', ['searchEverywhere', 'gotoClass', 'gotoFile', 'gotoSymbol', 'recentFiles', 'gotoLine', '-', 'declaration', 'implementations', 'fileStructure', 'back', 'forward', 'selectInProject']),
       section('Code', ['reformat', 'comment', 'rebuildIndex']),
       section('Refactor', ['rename', 'usages']),
-      section('Run', ['run', 'test', 'shot', 'rerun', 'stop', 'runConfigs', 'preview', 'previewTab']),
+      section('Run', ['run', 'test', 'shot', 'rerun', 'stop', 'runConfigs', 'preview', 'previewTab', '-', 'createInstaller']),
       section('Git', ['commit', 'push', 'update', 'branches', 'gitLog', 'fileHistory', 'annotate', 'rollbackFile']),
       { label: 'Help', items: [
         { label: 'Keyboard Shortcuts', action: () => this.shortcuts() },
         { label: 'JumPHP Documentation', action: () => this.openUrl('https://jumphp.net/docs') },
-        { label: 'About JumPHP IDE', action: () => dialog({ title: 'JumPHP IDE', body: el('p', {}, 'An IDE for PHP games and apps, written in PHP (JumPHP) with Monaco, the editor of VS Code.') }) },
+        ...(backend.kind === 'native' && this.updates && this.updates.state !== 'off' ? ['-',
+          { label: 'Check for Updates…', icon: 'download', action: () => this.checkForUpdates() },
+          { label: 'Update Automatically', checked: !!this.updates.auto, action: () => backend.invoke('update.auto', { on: !this.updates.auto }).then((st) => this.updateState(st)) },
+          '-'] : []),
+        { label: 'About JumPHP IDE', action: () => dialog({ title: 'JumPHP IDE', body: el('p', {}, `JumPHP IDE ${this.updates?.current || ''} — an IDE for PHP games and apps, written in PHP (JumPHP) with Monaco, the editor of VS Code.`) }) },
       ] },
     ].map((s) => (s.items && !s.items.length ? null : s)).filter(Boolean), at);
   }
@@ -491,6 +505,37 @@ class App {
   }
 
   /** The status bar shows when this computer's Claude answers the web IDE. */
+  /** The IDE's own updates (games/ide/src/SelfUpdate.php): installed in the background, then one click to restart. */
+  updateState(st, force = false) {
+    const before = this.updates?.state;
+    this.updates = st;
+    if (!st || (st.state === before && !force)) return;
+    const restart = { label: 'Restart Now', action: () => this.restartForUpdate() };
+    if (st.state === 'installed') {
+      notify(`JumPHP IDE ${st.version} is installed: restart to use it (or it starts next time).${st.notes ? ' ' + st.notes : ''}`, 'success', { title: 'Update', actions: [restart, { label: 'Later', action: () => null }], timeout: 0 });
+    } else if (st.state === 'available' && (force || !(st.installable && st.auto))) {
+      const actions = st.installable ? [{ label: 'Install', action: () => backend.invoke('update.install').then((s) => this.updateState(s)) }] : [];
+      notify(`JumPHP IDE ${st.version} is out (this one: ${st.current}).${st.installable ? '' : ' Run from its sources: update them with git.'}`, 'info', { title: 'Update', actions, timeout: 0 });
+    } else if (st.manual && st.state === 'latest') {
+      notify(`JumPHP IDE ${st.current} is the newest version.`, 'info', { title: 'Update' });
+    } else if (st.manual && st.state === 'error') {
+      notify(st.error || 'Cannot check for updates.', 'error', { title: 'Update' });
+    } else if ((st.manual || force) && st.state === 'installing') {
+      notify(`Downloading JumPHP IDE ${st.version}…`, 'info', { title: 'Update' });
+    }
+  }
+
+  /** Help > Check for Updates: the answer comes as an update.state event (or at once: installing, installed). */
+  checkForUpdates() {
+    backend.invoke('update.check').then((st) => this.updateState(st, st.state !== 'checking'))
+      .catch((e) => notify(e.message, 'error', { title: 'Update' }));
+  }
+
+  async restartForUpdate() {
+    try { await this.editors?.saveAll?.(); } catch { /* the files are saved as one types anyway */ }
+    backend.invoke('update.restart').catch((e) => notify(e.message, 'error', { title: 'Update' }));
+  }
+
   bridgeStatus(st) {
     let item = document.getElementById('sbBridge');
     if (!st?.on) { item?.remove(); return; }

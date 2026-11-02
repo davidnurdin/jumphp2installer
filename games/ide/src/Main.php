@@ -37,6 +37,7 @@ final class Main implements AppMain
     private float $nextScan = 0;
 
     private ClaudeBridge $bridge;
+    private SelfUpdate $updates;
     private string $filesSignature = '';
 
     public function boot(App $app): void
@@ -49,7 +50,16 @@ final class Main implements AppMain
         $server = (string)(getenv('JUMPHP_IDE_SERVER') ?: ($this->session['server'] ?? Playground::DEFAULT_SERVER));
         $this->playground = new Playground($app->http(), $server, $this->session['token'] ?? null);
         $this->bridge = new ClaudeBridge($this, $this->playground, $this->processes);
+        // a crash is saved for JumPHP's developers and sent at the next start (CrashReports)
+        $crashes = new CrashReports($app->storage, (string)$app->config->get('version'));
+        $app->on('crash', fn (\Throwable $e) => $crashes->save($e));
+        if (getenv('JUMPHP_IDE_CRASH_REPORTS') !== '0') {
+            $crashes->send($this->playground);
+        }
+        // the IDE keeps itself up to date (SelfUpdate: game.yaml app.update.url, games/ide/tools/release.sh)
+        $this->updates = new SelfUpdate($app);
         $this->registerCommands();
+        $this->updates->start();
         // bin/jumphp claude:connect, or the option kept from last time: this computer's Claude answers the web IDE
         if (getenv('JUMPHP_IDE_BRIDGE') === '1' || $app->options->get('claudeBridge', false)) {
             if (!empty($this->session['token'])) {
@@ -150,6 +160,11 @@ final class Main implements AppMain
             'project' => $this->ide !== null ? $this->info() : null,
             'version' => $this->app->config->get('version'),
         ];
+        $c['update.state'] = fn () => $this->updates->state();
+        $c['update.check'] = fn () => $this->updates->check(true);
+        $c['update.install'] = fn () => $this->updates->install();
+        $c['update.restart'] = fn () => $this->updates->restart();
+        $c['update.auto'] = fn (array $p) => $this->updates->setAuto(!empty($p['on']));
         $c['session.login'] = fn () => $this->login();
         $c['session.cancelLogin'] = function () {
             $this->loopback?->fail('sign-in cancelled');
@@ -184,6 +199,7 @@ final class Main implements AppMain
             ->then(fn (string $path) => $this->openProject($path));
         $c['projects.open'] = fn (array $p) => $this->openProject((string)($p['path'] ?? ''));
         $c['projects.close'] = function () {
+            $this->ide?->agent?->close();
             $this->ide = null;
             $this->app->options->set('reopen', false);
             return true;
@@ -194,6 +210,39 @@ final class Main implements AppMain
         };
         $c['projects.create'] = fn (array $p) => (new Creator($this, $this->playground, $this->processes))->create($p);
         $c['playground.publish'] = fn () => $this->publish();
+        // the open project's page on jumphp.net (the jumphp.net tool window): settings, numbers, messages, downloads
+        $api = fn (string $method, string $path = '', ?array $body = null) => $this->withSlug(fn (string $slug) =>
+            self::deferred($this->playground->request($method, '/api/ide/projects/' . rawurlencode($slug) . $path, $body)));
+        $c['playground.project'] = fn () => $api('GET');
+        $c['playground.update'] = fn (array $p) => $api('PATCH', '', (array)($p['settings'] ?? []));
+        $c['playground.stats'] = fn () => $api('GET', '/stats');
+        $c['playground.feedback'] = fn () => $api('GET', '/feedback');
+        $c['playground.downloads'] = fn () => $api('GET', '/downloads');
+        $c['playground.removeDownload'] = fn (array $p) => $api('DELETE', '/downloads/' . rawurlencode((string)($p['platform'] ?? '')));
+        $c['playground.installer'] = fn () => $api('POST', '/installer', []);
+        $c['playground.upload'] = fn (array $p) => $this->withSlug(fn (string $slug) => $this->upload($slug, (string)($p['platform'] ?? ''),
+            (string)($p['path'] ?? ''), (string)($p['version'] ?? '')));
+        // what the game's builds left in its dist/: the newest file per system
+        $c['playground.localFiles'] = function (array $p) {
+            $root = (string)$this->ide?->workspace->localPath();
+            $dir = trim(str_replace('..', '', (string)($p['dir'] ?? '')), '/');
+            $base = $root . ($dir !== '' ? "/$dir" : '') . '/dist';
+            $out = [];
+            foreach (['windows' => ['standalone/*-windows-x86_64.exe'], 'linux' => ['standalone/*-linux-x86_64'],
+                'macos' => ['apple/*-macos.zip', 'standalone/*-macos.zip'], 'android' => ['android-native/*.apk', 'android/*.apk']] as $platform => $patterns) {
+                $files = array_merge(...array_map(fn (string $g) => glob("$base/$g") ?: [], $patterns));
+                usort($files, fn (string $a, string $b) => filemtime($b) <=> filemtime($a));
+                if ($files !== []) {
+                    $out[$platform] = ['path' => substr($files[0], strlen($root) + 1), 'size' => filesize($files[0]), 'time' => filemtime($files[0])];
+                }
+            }
+            return $out;
+        };
+        $c['playground.link'] = function (array $p) {
+            $root = (string)$this->ide?->workspace->localPath();
+            $this->saveProjectSettings($root, ['slug' => (string)($p['slug'] ?? '') ?: null]);
+            return $this->info();
+        };
 
         // the system's dialogs and browser, for the pages (the built-in native.* commands, through the same door)
         $c['native.open'] = fn (array $p) => Native::supports('open')
@@ -264,9 +313,12 @@ final class Main implements AppMain
     {
         $workspace = new LocalWorkspace($path);
         $root = (string)$workspace->localPath();
+        $this->ide?->agent?->close();
         $this->ide = new Ide($workspace, $this->app->storage->path('cache'), function (string $event, array $payload): void {
             $this->app->send($event, $payload);
         }, $this->processes);
+        // games kept in their own repository (a jumphp.net project made of the game alone) run through this copy
+        $this->ide->setToolkit($this->app->storage->path('jumphp'), Creator::TEMPLATE);
         $this->filesSignature = '';
         $this->authorizeGit();
         $this->app->options->set('reopen', true);
@@ -353,6 +405,52 @@ final class Main implements AppMain
             ? self::deferred($this->playground->githubToken())->then(fn (array $r) => $git->setToken($r['token'] ?? null), fn () => null)
             : Deferred::resolved(null);
         return $start->then(fn () => $git->cloneInto($url, $target, fn (string $chunk) => $this->app->send('clone.output', ['chunk' => $chunk])))->then($done);
+    }
+
+    /** The open project's jumphp.net slug, or a rejection. */
+    private function withSlug(callable $work): Deferred
+    {
+        $slug = $this->ide !== null ? ($this->projectSettings((string)$this->ide->workspace->localPath())['slug'] ?? null) : null;
+        return $slug === null ? Deferred::rejected(new \RuntimeException('This project is not one of your jumphp.net projects.')) : $work((string)$slug);
+    }
+
+    /**
+     * Sends a file of the project (an executable, the Android app) to the game's downloads on jumphp.net: curl, the token
+     * in a header file (not in the command line), progress as playground.upload events.
+     */
+    private function upload(string $slug, string $platform, string $path, string $version): Deferred
+    {
+        $root = (string)$this->ide?->workspace->localPath();
+        $file = str_starts_with($path, '/') ? $path : "$root/$path";
+        $token = $this->session['token'] ?? null;
+        if (!is_file($file)) {
+            return Deferred::rejected(new \RuntimeException("No file $path: build it first."));
+        }
+        if ($token === null) {
+            return Deferred::rejected(new \RuntimeException('Sign in with jumphp.net first.'));
+        }
+        $headers = (string)tempnam(sys_get_temp_dir(), 'jph');
+        chmod($headers, 0600);
+        file_put_contents($headers, "Authorization: Bearer $token\nAccept: application/json\nContent-Type: application/octet-stream\nUser-Agent: jumphp-ide\n");
+        $url = $this->playground->server() . '/api/ide/projects/' . rawurlencode($slug) . '/downloads/' . rawurlencode($platform)
+            . '?' . http_build_query(['name' => basename($file), 'version' => $version]);
+        $this->app->send('playground.upload', ['platform' => $platform, 'state' => 'start', 'size' => filesize($file)]);
+        $started = $this->processes->start(['curl', '-sS', '-X', 'PUT', '-H', "@$headers", '--data-binary', "@$file", '-w', '\n%{http_code}', $url], $root);
+        return $started['done']->then(function (array $r) use ($headers, $platform) {
+            @unlink($headers);
+            $lines = explode("\n", rtrim((string)$r['stdout']));
+            $status = (int)array_pop($lines);
+            $data = json_decode(implode("\n", $lines), true);
+            $this->app->send('playground.upload', ['platform' => $platform, 'state' => 'end']);
+            if ($r['code'] !== 0 || $status < 200 || $status >= 300) {
+                throw new \RuntimeException(is_array($data) && isset($data['error']) ? (string)$data['error']
+                    : 'The upload failed (' . ($status ?: 'curl: ' . trim((string)$r['stderr'])) . ')');
+            }
+            return $data;
+        }, function (\Throwable $e) use ($headers) {
+            @unlink($headers);
+            throw $e;
+        });
     }
 
     private function publish(): Deferred
