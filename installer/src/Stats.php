@@ -50,7 +50,8 @@ final class Stats
     /** A Stats that sends nothing. */
     /**
      * An anonymous id of this computer for one package (32 hex), the same at every run: a hash of the system's own id
-     * of the computer (Linux /etc/machine-id, Windows' MachineGuid, macOS' IOPlatformUUID) with the package, so the
+     * of the computer (Linux /etc/machine-id, Windows' MachineGuid, macOS' IOPlatformUUID) with the package (its
+     * statistics address: the same for every installer of it), so the
      * system's id never leaves the computer and two packages can not be linked. Without one: a random id kept in the
      * user's data folder ($dataDir, for tests). Never the address (IP): computers at home share one.
      */
