@@ -3,7 +3,7 @@
 game:
   id: jumphp2installer
   title: "Setup"
-  version: 0.2.1
+  version: 0.2.2
   description: "The installer of jumphp2installer: downloads and installs the newest version of a package, with its pictures, license, options and uninstaller."
   lang: en
   ui: webview

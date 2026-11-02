@@ -82,4 +82,24 @@ final class StatsTest extends TestCase
         self::assertFalse(Stats::fromManifest(['stats' => $stats->forManifest()], 'silent', 'off')->isOn());
         self::assertFalse(Stats::fromManifest([], 'silent')->isOn());
     }
+
+    public function testTheMachineIdIsAnonymousStableAndPerPackage(): void
+    {
+        $a = Stats::machineId('k2q9x7a1', null, '0123456789abcdef0123456789abcdef');
+        self::assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $a);
+        self::assertSame($a, Stats::machineId('k2q9x7a1', null, '0123456789ABCDEF0123456789ABCDEF'), 'the same computer, every run');
+        self::assertNotSame($a, Stats::machineId('k2q9x7a1', null, 'fedcba9876543210fedcba9876543210'), 'another computer');
+        self::assertNotSame($a, Stats::machineId('other123', null, '0123456789abcdef0123456789abcdef'), 'another package: not linked');
+        self::assertStringNotContainsString('0123456789abcdef', $a, 'the system id never leaves the computer');
+    }
+
+    public function testWithoutASystemIdARandomOneIsKept(): void
+    {
+        $dir = sys_get_temp_dir() . '/stats-id-' . bin2hex(random_bytes(4));
+        $first = Stats::machineId('k2q9x7a1', $dir, '');
+        self::assertSame($first, Stats::machineId('k2q9x7a1', $dir, ''), 'kept in the data folder');
+        self::assertFileExists("$dir/id");
+        exec('rm -rf ' . escapeshellarg($dir));
+        self::assertMatchesRegularExpression('/^[0-9a-f]{32}$/', Stats::machineId('k2q9x7a1'), 'this computer (Docker: its machine-id, or a kept random one)');
+    }
 }

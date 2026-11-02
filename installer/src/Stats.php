@@ -9,9 +9,10 @@ namespace JumPHP2Installer;
  *
  * Never in the way: a POST of JSON at a time, without blocking (Download, a little at each frame), whose failure
  * changes nothing; flush() at the end waits a moment for what is still on the way. Nothing personal is sent: the
- * package, its version, the system and its architecture, the installer's version, a random id of this run (the
- * same for its events, and kept by the uninstaller), and for a failure the error with the user's folders replaced
- * by {home}, {temp}, {folder}.
+ * package, its version, the system and its architecture, the installer's version, an anonymous id of this computer
+ * for this package (machineId(): a hash, the same at each run on this computer, so two computers count two installs
+ * and installing again counts once; kept by the uninstaller), and for a failure the error with the user's folders
+ * replaced by {home}, {temp}, {folder}.
  *
  * Where to (address()), the first of:
  *   - the end user's no: --no-stats, or env JUMPHP2INSTALLER_STATS=off               nothing
@@ -31,7 +32,7 @@ final class Stats
     public const EVENTS = ['start', 'page', 'cancel', 'fail', 'install', 'run', 'uninstall'];
     private const OFF = ['', '0', 'off', 'no', 'false', 'none'];
 
-    /** The random id of this run (32 hex). */
+    /** The id of this install (32 hex): machineId() of the package, or a random one */
     public readonly string $install;
     /** @var list<array{Download, string}> POSTs on the way, and their answer file */
     private array $sending = [];
@@ -47,6 +48,55 @@ final class Stats
     }
 
     /** A Stats that sends nothing. */
+    /**
+     * An anonymous id of this computer for one package (32 hex), the same at every run: a hash of the system's own id
+     * of the computer (Linux /etc/machine-id, Windows' MachineGuid, macOS' IOPlatformUUID) with the package, so the
+     * system's id never leaves the computer and two packages can not be linked. Without one: a random id kept in the
+     * user's data folder ($dataDir, for tests). Never the address (IP): computers at home share one.
+     */
+    public static function machineId(string $package, ?string $dataDir = null, ?string $system = null): string
+    {
+        $system ??= self::systemId();
+        if ($system === null || $system === '') {
+            $dir = $dataDir ?? self::dataDir();
+            $file = $dir . DIRECTORY_SEPARATOR . 'id';
+            $system = is_file($file) ? trim((string)@file_get_contents($file)) : '';
+            if (!preg_match('/^[0-9a-f]{32}$/', $system)) {
+                $system = bin2hex(random_bytes(16));
+                @mkdir($dir, 0700, true);
+                @file_put_contents($file, $system);
+            }
+        }
+        return substr(hash('sha256', "jumphp2installer\0$package\0" . strtolower(trim($system))), 0, 32);
+    }
+
+    /** The system's id of this computer, or null. */
+    public static function systemId(): ?string
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            // reg.exe without a console window (the installer is a GUI program): Command
+            $out = Command::run(['reg', 'query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid', '/reg:64'])->output;
+            return preg_match('/MachineGuid\s+REG_SZ\s+([0-9A-Fa-f-]{36})/', $out, $m) ? $m[1] : null;
+        }
+        if (PHP_OS_FAMILY === 'Darwin') {
+            $out = Command::run(['ioreg', '-rd1', '-c', 'IOPlatformExpertDevice'])->output;
+            return preg_match('/"IOPlatformUUID" = "([0-9A-Fa-f-]{36})"/', $out, $m) ? $m[1] : null;
+        }
+        foreach (['/etc/machine-id', '/var/lib/dbus/machine-id'] as $file) {
+            $id = is_readable($file) ? trim((string)@file_get_contents($file)) : '';
+            if (preg_match('/^[0-9a-f]{32}$/', $id)) {
+                return $id;
+            }
+        }
+        return null;
+    }
+
+    private static function dataDir(): string
+    {
+        $base = getenv('LOCALAPPDATA') ?: getenv('XDG_DATA_HOME') ?: ((getenv('HOME') ?: sys_get_temp_dir()) . (PHP_OS_FAMILY === 'Darwin' ? '/Library/Application Support' : '/.local/share'));
+        return rtrim((string)$base, '/\\') . DIRECTORY_SEPARATOR . 'jumphp2installer';
+    }
+
     public static function off(): self
     {
         return new self(null);

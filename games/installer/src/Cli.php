@@ -20,7 +20,7 @@ use JumPHP2Installer\Uninstaller;
  */
 final class Cli
 {
-    public const VERSION = '0.2.0';
+    public const VERSION = '0.2.2';
 
     /** @var resource|null where it writes (tests: php://memory), STDOUT / STDERR when null */
     public static $output = null;
@@ -189,7 +189,8 @@ final class Cli
             return Stats::off();
         }
         $url = Stats::address($package, $package->script->toArray()['stats'] ?? null, $configured, $refused);
-        return new Stats($url, Stats::base($package, $session->version, $session->vars(), self::VERSION, $mode));
+        // one id per computer and package (anonymous): two computers count two installs, installing again counts once
+        return new Stats($url, Stats::base($package, $session->version, $session->vars(), self::VERSION, $mode), $url !== null ? Stats::machineId($package->id) : null);
     }
 
     /** The statistics of the install an uninstaller removes (its uninstall.json says where). */
