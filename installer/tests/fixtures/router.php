@@ -1,6 +1,6 @@
 <?php
 // php -S router for the tests: /bytes/<n> (n bytes, Content-Length), /redirect -> /bytes/1000, /missing (404),
-// /pkg/... files of tests/fixtures/pkg, /api/packages/demo (the package API)
+// /pkg/... files of tests/fixtures/pkg, /api/packages/demo (the package API), POST /api/packages/demo/stats (appended to $STATS_FILE)
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 if (preg_match('#^/bytes/(\d+)$#', $path, $m)) {
     header('Content-Type: application/octet-stream');
@@ -10,6 +10,11 @@ if (preg_match('#^/bytes/(\d+)$#', $path, $m)) {
 }
 if ($path === '/redirect') {
     header('Location: /bytes/1000', true, 302);
+    return true;
+}
+if ($path === '/api/packages/demo/stats' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    file_put_contents(getenv('STATS_FILE'), file_get_contents('php://input') . "\n", FILE_APPEND | LOCK_EX);
+    http_response_code(204);
     return true;
 }
 if ($path === '/api/packages/demo') {

@@ -101,8 +101,8 @@ final class Script
     private function normalize(array $raw): array
     {
         foreach (array_keys($raw) as $key) {
-            if (!in_array($key, ['installer', 'app', 'version', 'pages', 'steps'], true)) {
-                $this->problem((string)$key, "unknown section '$key' (installer, app, version, pages, steps)");
+            if (!in_array($key, ['installer', 'app', 'version', 'pages', 'steps', 'stats'], true)) {
+                $this->problem((string)$key, "unknown section '$key' (installer, app, version, pages, steps, stats)");
             }
         }
         $format = $raw['installer'] ?? self::FORMAT;
@@ -114,7 +114,24 @@ final class Script
         $options = [];
         $pages = $this->pages($raw['pages'] ?? null, $options);
         $steps = $this->steps($raw['steps'] ?? null, array_keys($options));
-        return ['installer' => self::FORMAT, 'app' => $app, 'version' => $version, 'pages' => $pages, 'options' => $options, 'steps' => $steps];
+        return ['installer' => self::FORMAT, 'app' => $app, 'version' => $version, 'pages' => $pages, 'options' => $options, 'steps' => $steps,
+            'stats' => $this->stats($raw['stats'] ?? null)];
+    }
+
+    /** stats: false (none sent) | https://... (where the installer tells what happens: Stats) | absent (the server's) */
+    private function stats(mixed $stats): string|false|null
+    {
+        if ($stats === null || $stats === true) {
+            return null;
+        }
+        if ($stats === false) {
+            return false;
+        }
+        if (!is_string($stats) || !preg_match('#^https?://\S+$#', $stats)) {
+            $this->problem('stats', 'stats: the https:// address that receives the statistics, or false (none sent)');
+            return null;
+        }
+        return $stats;
     }
 
     private function app(mixed $app): array

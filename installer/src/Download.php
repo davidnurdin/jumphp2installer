@@ -10,6 +10,8 @@ namespace JumPHP2Installer;
  *
  *   $d = new Download('https://example.com/app.zip', '/tmp/app.zip');
  *   ... each frame: if ($d->tick()) { $d->error ?? 'done'; }   $d->received / $d->total
+ *
+ * With a $body it is a POST of that JSON instead (the statistics: Stats); its answer goes to $file the same way.
  */
 final class Download
 {
@@ -35,7 +37,7 @@ final class Download
     /** @var resource|null */
     private $source = null;
 
-    public function __construct(public readonly string $url, public readonly string $file, private readonly float $timeout = 60.0)
+    public function __construct(public readonly string $url, public readonly string $file, private readonly float $timeout = 60.0, private ?string $body = null)
     {
         $this->finalUrl = $url;
         $this->hash = hash_init('sha256');
@@ -138,8 +140,10 @@ final class Download
         }
         stream_set_blocking($socket, false);
         $this->socket = $socket;
-        $this->buffer = 'GET ' . $path . " HTTP/1.1\r\nHost: " . $this->host . ($p['port'] ?? null ? ':' . $port : '')
-            . "\r\nUser-Agent: jumphp2installer\r\nAccept: */*\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n";
+        $post = $this->body !== null;
+        $this->buffer = ($post ? 'POST ' : 'GET ') . $path . " HTTP/1.1\r\nHost: " . $this->host . ($p['port'] ?? null ? ':' . $port : '')
+            . "\r\nUser-Agent: jumphp2installer\r\nAccept: */*\r\nAccept-Encoding: identity\r\nConnection: close\r\n"
+            . ($post ? "Content-Type: application/json\r\nContent-Length: " . strlen((string)$this->body) . "\r\n\r\n" . $this->body : "\r\n");
         $this->state = 'connect';
     }
 
@@ -243,6 +247,9 @@ final class Download
                 throw new \RuntimeException('too many redirects');
             }
             fclose($this->socket);
+            if (!in_array($this->status, [307, 308], true)) {
+                $this->body = null;     // 301 / 302 / 303: the next one is a GET
+            }
             $this->finalUrl = self::resolve($this->finalUrl, $headers['location']);
             $this->open($this->finalUrl);
             return true;

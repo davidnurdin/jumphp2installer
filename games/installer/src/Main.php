@@ -12,6 +12,7 @@ use JumPHP\Tauri\NativeEvent;
 use JumPHP2Installer\Command;
 use JumPHP2Installer\Runner;
 use JumPHP2Installer\Session;
+use JumPHP2Installer\Stats;
 use JumPHP2Installer\Uninstaller;
 
 /**
@@ -21,6 +22,9 @@ use JumPHP2Installer\Uninstaller;
  * at each frame, and tells the page how far it got ('progress').
  *
  * Copied into the install folder as its uninstaller: started with --uninstall (or from there), it removes the app.
+ *
+ * What happens is told to the package's statistics address (Stats): started, the pages seen ('wizard' from the
+ * page), cancelled (where), failed (which step, why), installed, the app launched, uninstalled.
  */
 final class Main implements AppMain, AppCli
 {
@@ -33,6 +37,11 @@ final class Main implements AppMain, AppCli
     private array $waiting = [];
     private bool $sentDone = false;
     private string $title = 'Setup';
+    private Stats $stats;
+    /** the outcome was told (installed, failed, cancelled, uninstalled): nothing more but 'run' */
+    private bool $told = false;
+    private bool $counted = false;
+    private string $page = '';
 
     /** The command line: --help, --version, --silent installs and uninstalls, --check. Null: the window. */
     public static function cli(array $args, string $root): ?int
@@ -44,6 +53,7 @@ final class Main implements AppMain, AppCli
     {
         $this->app = $app;
         $this->source = Source::detect(array_values(array_slice((array)($_SERVER['argv'] ?? []), 1)));
+        $this->stats = Stats::off();
         $this->start();
 
         $app->command('load', fn (): Task|array => $this->load());
@@ -64,12 +74,21 @@ final class Main implements AppMain, AppCli
             $this->report($app->frameCount() % 3 === 0);
         });
 
+        // the page tells which page of the wizard it shows
+        $app->on('page:wizard', function (mixed $p): void {
+            $this->page = is_array($p) ? (string)($p['page'] ?? '') : '';
+            !$this->told && $this->page !== '' && $this->stats->send('page', ['page' => $this->page]);
+        });
+
         $app->window()->on('close-requested', function (NativeEvent $e): void {
             if ($this->busy()) {
                 $e->preventDefault();
                 $this->cancel();
+                return;
             }
+            $this->ending();
         });
+        $app->on('quit', fn () => $this->ending());
     }
 
     /** The state (tests). */
@@ -89,13 +108,38 @@ final class Main implements AppMain, AppCli
         $this->runner = null;
         $this->uninstaller = null;
         $this->sentDone = false;
+        $this->counted = false;
+        $this->told = false;
         if ($this->source->mode !== 'uninstall') {
             $this->session = $this->source->session();
         }
     }
 
+    /** The statistics of this run, once its package is in (or of the install the uninstaller removes). */
+    private function startStats(): void
+    {
+        [$configured, $refused] = Stats::configured(array_values(array_slice((array)($_SERVER['argv'] ?? []), 1)));
+        $this->stats = $this->source->mode === 'uninstall'
+            ? Cli::uninstallStats($this->source->manifest, $configured, $refused, 'window')
+            : Cli::sessionStats($this->session, $configured, $refused, 'window');
+        $this->source->mode !== 'uninstall' && $this->stats->send('start');
+    }
+
+    /** The window goes: a run that did not reach its end was cancelled there; what is on the way gets a moment. */
+    private function ending(): void
+    {
+        if (!$this->told && $this->stats->isOn()) {
+            $this->told = true;
+            $this->stats->send('cancel', ['page' => $this->page, 'step' => $this->runner?->step()]);
+        }
+        $this->stats->flush(2.0);
+    }
+
     private function tick(): void
     {
+        $this->session?->tick();
+        $this->countRun();
+        $this->stats->tick();
         if ($this->session !== null && $this->session->tick() && $this->waiting !== []) {
             $answer = $this->answer();
             foreach ($this->waiting as $task) {
@@ -114,6 +158,10 @@ final class Main implements AppMain, AppCli
             return;
         }
         $done = $work->isDone();
+        if ($done && !$this->told) {
+            $this->told = true;
+            $this->tellOutcome($work);
+        }
         if (!$now && !$done) {
             return;
         }
@@ -125,6 +173,19 @@ final class Main implements AppMain, AppCli
             'error' => $work->error,
         ]);
         $this->sentDone = $done;
+    }
+
+    private function tellOutcome(Runner|Uninstaller $work): void
+    {
+        if ($work instanceof Uninstaller) {
+            $this->stats->send('uninstall', ['seconds' => $this->stats->seconds()]);
+        } elseif ($work->error === 'cancelled') {
+            $this->stats->send('cancel', ['page' => 'install', 'step' => $work->step()]);
+        } elseif ($work->error !== null) {
+            $this->stats->send('fail', ['step' => $work->step(), 'error' => Stats::clean($work->error, $work->vars())]);
+        } else {
+            $this->stats->send('install', ['seconds' => $this->stats->seconds()]);
+        }
     }
 
     /** What the page shows first: the package (when it is in), or the uninstall, or what went wrong. */
@@ -149,8 +210,18 @@ final class Main implements AppMain, AppCli
         return $task;
     }
 
+    /** The package is in: the run is counted, before the page hears of it (its first 'wizard' comes after). */
+    private function countRun(): void
+    {
+        if ($this->session !== null && $this->session->isReady() && !$this->counted) {
+            $this->counted = true;
+            $this->startStats();
+        }
+    }
+
     private function answer(): array
     {
+        $this->countRun();
         $s = $this->session;
         if ($s === null || $s->error !== null) {
             return ['mode' => 'error', 'error' => $s === null ? 'No package to install.' : (string)$s->error, 'retry' => in_array($this->source->mode, ['remote', 'static'], true)];
@@ -175,6 +246,7 @@ final class Main implements AppMain, AppCli
         $folder = trim((string)($p['folder'] ?? '')) ?: $this->session->defaultFolder();
         $options = array_map('boolval', (array)($p['options'] ?? []));
         $this->runner = $this->session->install($folder, $options, Source::executable());
+        $this->runner->stats = $this->stats->forManifest();
         $this->sentDone = false;
         return true;
     }
@@ -185,6 +257,7 @@ final class Main implements AppMain, AppCli
             return false;
         }
         $this->uninstaller = new Uninstaller($this->source->manifest, Source::executable());
+        $this->startStats();
         $this->sentDone = false;
         return true;
     }
@@ -196,6 +269,7 @@ final class Main implements AppMain, AppCli
                 ->then(fn (mixed $yes) => $yes ? $this->runner?->cancel() : null);
             return false;
         }
+        $this->ending();
         $this->app->quit();
         return true;
     }
@@ -211,7 +285,9 @@ final class Main implements AppMain, AppCli
         }
         if ($run && $target !== null && $this->runner?->error === null) {
             Command::detached($target);
+            $this->stats->send('run');
         }
+        $this->ending();
         $this->app->quit();
         return true;
     }

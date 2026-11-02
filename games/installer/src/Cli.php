@@ -4,6 +4,8 @@ namespace App;
 
 use JumPHP2Installer\Runner;
 use JumPHP2Installer\Script;
+use JumPHP2Installer\Session;
+use JumPHP2Installer\Stats;
 use JumPHP2Installer\Uninstaller;
 
 /**
@@ -18,7 +20,7 @@ use JumPHP2Installer\Uninstaller;
  */
 final class Cli
 {
-    public const VERSION = '0.1.0';
+    public const VERSION = '0.2.0';
 
     /** @var resource|null where it writes (tests: php://memory), STDOUT / STDERR when null */
     public static $output = null;
@@ -66,7 +68,7 @@ final class Cli
             return 2;
         }
         try {
-            \JumPHP2Installer\Binary::patchFile($from, $out, $server, self::value($args, 'package') ?? 'static');
+            \JumPHP2Installer\Binary::patchFile($from, $out, $server, self::value($args, 'package') ?? 'static', self::value($args, 'stats'));
         } catch (\Throwable $e) {
             $this->err($e->getMessage());
             return 1;
@@ -131,10 +133,15 @@ final class Cli
                 $options[substr($a, 12)] = false;
             }
         }
+        [$configured, $refused] = Stats::configured($args);
+        $stats = self::sessionStats($session, $configured, $refused, 'silent');
+        $stats->send('start');
         $this->out(sprintf('Installing %s %s into %s', $session->view()['app']['name'], $session->version, $folder));
         $runner = $session->install($folder, $options, Source::executable());
+        $runner->stats = $stats->forManifest();
         $printed = 0;
-        $ok = $runner->runAll(function () use ($runner, &$printed): void {
+        $ok = $runner->runAll(function () use ($runner, $stats, &$printed): void {
+            $stats->tick();
             for (; $printed < count($runner->log); $printed++) {
                 $this->out($runner->log[$printed]);
             }
@@ -143,8 +150,12 @@ final class Cli
             $this->out($runner->log[$printed]);
         }
         if (!$ok) {
+            $stats->send('fail', ['step' => $runner->step(), 'error' => Stats::clean((string)$runner->error, $runner->vars())]);
+            $stats->flush();
             return 1;
         }
+        $stats->send('install', ['seconds' => $stats->seconds()]);
+        $stats->flush();
         $this->out('Installed.');
         return 0;
     }
@@ -158,12 +169,33 @@ final class Cli
         }
         $u = new Uninstaller($manifest, Source::executable());
         $this->out('Removing ' . $u->name() . ' from ' . ($manifest['folder'] ?? ''));
+        [$configured, $refused] = Stats::configured($_SERVER['argv'] ?? []);
+        $stats = self::uninstallStats($manifest, $configured, $refused, 'silent');
         $u->runAll();
         foreach ($u->log as $line) {
             $this->out($line);
         }
+        $stats->send('uninstall', ['seconds' => $stats->seconds()]);
+        $stats->flush();
         $this->out('Uninstalled.');
         return 0;
+    }
+
+    /** The statistics of a run whose package is in (Stats::address()). */
+    public static function sessionStats(?Session $session, ?string $configured, bool $refused, string $mode): Stats
+    {
+        $package = $session?->package;
+        if ($package === null) {
+            return Stats::off();
+        }
+        $url = Stats::address($package, $package->script->toArray()['stats'] ?? null, $configured, $refused);
+        return new Stats($url, Stats::base($package, $session->version, $session->vars(), self::VERSION, $mode));
+    }
+
+    /** The statistics of the install an uninstaller removes (its uninstall.json says where). */
+    public static function uninstallStats(?array $manifest, ?string $configured, bool $refused, string $mode): Stats
+    {
+        return Stats::fromManifest($manifest, $mode, $configured, $refused);
     }
 
     public static function help(): string
@@ -181,6 +213,8 @@ final class Cli
               --server=URL --package=ID    another server / package
               --server=github:owner/repo   the package of a GitHub release (install.yaml and its files)
               --make=OUT --server=SOURCE   write an installer of SOURCE (from this one, or --from=BASE)
+                --stats=URL                ... that tells URL what happens (started, cancelled, failed, installed)
+              --no-stats                   tell nothing (env JUMPHP2INSTALLER_STATS=off: the same)
               --version, --help
             TXT;
     }

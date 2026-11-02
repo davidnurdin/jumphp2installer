@@ -25,7 +25,7 @@ final class Binary
      * reserve shrinks by what is added (Windows' micro finds its PHAR by offsets that must not move). Without one,
      * the section grows (enough on Linux and macOS).
      */
-    public static function patch(string $binary, string $server, string $package): string
+    public static function patch(string $binary, string $server, string $package, ?string $stats = null): string
     {
         [$offset, $length, $ini] = self::section($binary);
         $reserved = str_contains($ini, "\n" . self::RESERVE) || str_starts_with($ini, self::RESERVE);
@@ -33,6 +33,9 @@ final class Binary
             trim($l) !== '' && !str_starts_with(ltrim($l), 'jumphp2installer.')));
         $lines[] = 'jumphp2installer.server="' . addcslashes($server, '"\\') . '"';
         $lines[] = 'jumphp2installer.package="' . addcslashes($package, '"\\') . '"';
+        if ($stats !== null && $stats !== '') {
+            $lines[] = 'jumphp2installer.stats="' . addcslashes($stats, '"\\') . '"';     // where it tells what happens (Stats)
+        }
         $newIni = implode("\n", $lines) . "\n";
         if ($reserved) {
             $room = $length - strlen($newIni) - strlen(self::RESERVE) - 1;
@@ -48,26 +51,26 @@ final class Binary
      * patch() on a file: an installer executable (Linux, Windows), or the .zip of the macOS app (its executable,
      * Contents/MacOS/*, is patched inside: Zip). Writes $out.
      */
-    public static function patchFile(string $in, string $out, string $server, string $package): void
+    public static function patchFile(string $in, string $out, string $server, string $package, ?string $stats = null): void
     {
         $data = @file_get_contents(self::readable($in));
         if ($data === false) {
             throw new \RuntimeException("cannot read $in");
         }
         if (!str_starts_with($data, "PK\x03\x04")) {
-            if (@file_put_contents($out, self::patch($data, $server, $package)) === false) {
+            if (@file_put_contents($out, self::patch($data, $server, $package, $stats)) === false) {
                 throw new \RuntimeException("cannot write $out");
             }
             @chmod($out, 0755);
             return;
         }
         unset($data);
-        $patched = Zip::rewrite($in, $out, static function (string $name, string $bytes) use ($server, $package): ?string {
+        $patched = Zip::rewrite($in, $out, static function (string $name, string $bytes) use ($server, $package, $stats): ?string {
             if (!preg_match('#\\.app/Contents/MacOS/[^/]+$#', $name)) {
                 return null;
             }
             try {
-                return self::patch($bytes, $server, $package);
+                return self::patch($bytes, $server, $package, $stats);
             } catch (\RuntimeException) {
                 return null;    // another program of the app (not the installer)
             }

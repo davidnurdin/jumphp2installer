@@ -18,6 +18,8 @@ final class Runner
     public string $label = '';
     /** @var list<string> */
     public array $log = [];
+    /** @var ?array{url: string, install: string, base: array<string, string>} kept in uninstall.json: the uninstaller tells it too (Stats) */
+    public ?array $stats = null;
 
     /** @var list<array<string, mixed>> the steps this computer runs (if: / os: applied) */
     private array $steps = [];
@@ -83,7 +85,7 @@ final class Runner
             'server' => $this->package->server,
             'folder' => $this->vars->path('{folder}'),
             'installed' => date('c'),
-        ] + $this->manifest;
+        ] + ($this->stats !== null ? ['stats' => $this->stats] : []) + $this->manifest;
     }
 
     /** Some work (~$budgetMs ms). True when finished: then $error is null (installed) or says what failed. */
@@ -131,6 +133,12 @@ final class Runner
             usleep(2000);
         }
         return $this->error === null;
+    }
+
+    /** The action of the step running (or that failed): download, extract... null before the first / after the last. */
+    public function step(): ?string
+    {
+        return $this->steps[$this->index]['action'] ?? null;
     }
 
     public function cancel(): void

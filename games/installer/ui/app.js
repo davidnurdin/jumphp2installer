@@ -70,6 +70,11 @@
 
   const show = () => {
     const p = page();
+    // PHP counts the pages seen (the installer's statistics: where people stop)
+    if (state.told !== state.index) {
+      state.told = state.index;
+      try { jumphp.send && jumphp.send('wizard', { page: p.type }); } catch (e) { /* the server's preview */ }
+    }
     const first = state.index === 0;
     const beforeInstall = state.pages[state.index + 1]?.type === 'install';
     const nextLabel = beforeInstall ? t('install') : t('next');

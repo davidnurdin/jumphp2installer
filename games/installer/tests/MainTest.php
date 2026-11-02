@@ -56,6 +56,7 @@ final class MainTest extends AppTestCase
         parent::tearDown();
         putenv('JUMPHP2INSTALLER_SCRIPT');
         putenv('JUMPHP2INSTALLER_SELF');
+        putenv('JUMPHP2INSTALLER_STATS');
         Runner::remove(self::$root);
     }
 
@@ -166,5 +167,78 @@ final class MainTest extends AppTestCase
         self::assertSame(0, Main::cli(['--uninstall', '--silent'], (string)getcwd()));
         self::assertDirectoryDoesNotExist($folder);
         Cli::$output = null;
+    }
+
+    /** @return list<array<string, mixed>> the events the statistics file got */
+    private static function events(): array
+    {
+        $file = self::$root . '/stats.jsonl';
+        return array_map(static fn (string $l): array => json_decode($l, true), is_file($file) ? file($file, FILE_IGNORE_NEW_LINES) : []);
+    }
+
+    private function withStats(): void
+    {
+        putenv('JUMPHP2INSTALLER_STATS=' . self::$root . '/stats.jsonl');
+        parent::tearDown();
+        parent::setUp();
+    }
+
+    public function testAWizardClosedOnItsLicensePageIsCountedAsCancelledThere(): void
+    {
+        $this->withStats();
+        $this->invoke('load');
+        $this->pageSend('wizard', ['page' => 'welcome']);
+        $this->pageSend('wizard', ['page' => 'license']);
+        $this->frames(2);
+        $this->invoke('cancel');
+        $events = self::events();
+        self::assertSame(['start', 'page', 'page', 'cancel'], array_column($events, 'event'));
+        self::assertSame('license', $events[3]['page']);
+        self::assertSame('demo', $events[0]['app']);
+        self::assertSame(['1.0.0', 'window', Cli::VERSION], [$events[0]['version'], $events[0]['mode'], $events[0]['installer']]);
+        self::assertCount(1, array_unique(array_column($events, 'install')));
+    }
+
+    public function testAnInstallThenItsUninstallAreTheSameRunInTheStatistics(): void
+    {
+        $this->withStats();
+        $this->invoke('load');
+        $folder = self::$root . '/home/Apps/Demo';
+        $this->invoke('install', ['folder' => $folder, 'options' => ['desktop' => false]]);
+        $this->untilDone();
+        $this->invoke('finish', ['run' => false]);
+        self::assertSame(['start', 'install'], array_column(self::events(), 'event'));
+
+        putenv('JUMPHP2INSTALLER_SCRIPT');
+        putenv("JUMPHP2INSTALLER_SELF=$folder/uninstall");
+        parent::tearDown();
+        parent::setUp();
+        $this->invoke('load');
+        $this->invoke('uninstall');
+        $this->untilDone();
+        $events = self::events();
+        self::assertSame(['start', 'install', 'uninstall'], array_column($events, 'event'));
+        self::assertSame($events[0]['install'], $events[2]['install']);
+    }
+
+    public function testAFailedStepIsToldWithoutTheUsersFolders(): void
+    {
+        $this->withStats();
+        unlink(self::$root . '/pkg/demo.zip');
+        Cli::$output = fopen('php://memory', 'w+');
+        self::assertSame(1, Main::cli(['--silent', '--folder=' . self::$root . '/home/Broken'], (string)getcwd()));
+        Cli::$output = null;
+        $fail = self::events()[1];
+        self::assertSame(['fail', 'download', 'silent'], [$fail['event'], $fail['step'], $fail['mode']]);
+        self::assertStringNotContainsString(self::$root . '/home', $fail['error']);
+    }
+
+    public function testNoStatisticsWhenTheUserSaysNo(): void
+    {
+        putenv('JUMPHP2INSTALLER_STATS=off');
+        Cli::$output = fopen('php://memory', 'w+');
+        self::assertSame(0, Main::cli(['--silent', '--folder=' . self::$root . '/home/Quiet', '--no-stats'], (string)getcwd()));
+        Cli::$output = null;
+        self::assertSame([], self::events());
     }
 }
