@@ -1,5 +1,27 @@
 # TODO
 
+## Installers: statistics and a developer dashboard
+
+Today the server only counts downloads (`Package::$downloads`). Wanted:
+
+- events sent by the installer (non-blocking, never fails the install, no personal data: package, version, os,
+  arch, installer version, a random install id):
+  - generated: an installer made for a package (server side, per system);
+  - started: the wizard opened (or `--silent` started);
+  - each page reached (welcome, license, folder, options, install, finish): where people leave;
+  - cancelled: on which page, or during which step;
+  - failed: the step and its error message;
+  - finished: installed, how long it took; the "run" box ticked or not;
+  - uninstalled;
+- the statistics URL configurable in the installer for those who do not use jumphp.net (install.yaml
+  `stats: https://my-site/stats` and/or a `jumphp2installer.stats` ini line written by `--make` / `--stats=`;
+  `stats: false` = nothing sent), documented with the payload format;
+- the controller that receives them, in `server/` and in the playground (POST JSON, rate limited, stored per
+  package and per day);
+- a developer dashboard per package (server and jumphp.net studio): downloads, generated, started, finished,
+  cancelled / failed (funnel per page and step, the most frequent errors), per system and version, over time;
+- docs (docs/installer/, the playground page in 14 languages) and the skill.
+
 ## Desktop apps (Tauri): the next targets
 
 Done: Linux, Windows, macOS runtime (workflow `tauri`), clipboard, tray, global shortcuts, menus, hybrid games (two
