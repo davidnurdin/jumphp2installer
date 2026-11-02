@@ -19,6 +19,8 @@ the newest version of My App, installed with shortcuts and an uninstaller
 - **Anywhere**: your own server ([server.md](server.md): Symfony + MariaDB in Docker, with the editor), jumphp.net
   (signed in › Developer › Installers), or **no server at all**: GitHub releases ([github.md](github.md)).
 - **No administrator rights**: everything goes into the user's own folders; Windows "Apps" list, Linux menu, macOS.
+- **Statistics**: downloads, runs, where people stop, which step fails and why, in a dashboard; nothing personal, the
+  user can refuse ([stats.md](stats.md)).
 - **For admins too**: `--silent`, `--folder=`, `--option=`, `--uninstall --silent` ([installer.md](installer.md)).
 
 | Page | |
@@ -27,6 +29,7 @@ the newest version of My App, installed with shortcuts and an uninstaller
 | [installer.md](installer.md) | the executable: where it finds its package, command line, uninstall, systems, building it |
 | [server.md](server.md) | the web server: install it (Docker), accounts, the editor, the API any server can implement |
 | [github.md](github.md) | packages and installers in GitHub releases, no server |
+| [stats.md](stats.md) | statistics: what installers tell (started, cancelled where, failed why, installed), the dashboard |
 | [guide.fr.md](guide.fr.md) | le guide en français |
 | [examples/](examples/) | scripts to start from |
 
@@ -34,7 +37,7 @@ the newest version of My App, installed with shortcuts and an uninstaller
 
 | Folder | |
 |---|---|
-| `installer/` | the library (PHP, `JumPHP2Installer\`): `Script` (reads and checks), `Vars`, `Session` (fetches a package), `Runner` (the steps, a little each frame), `Uninstaller`, `Download` (non-blocking HTTP), `Binary` (writes the address into an installer). Shared by all the others |
+| `installer/` | the library (PHP, `JumPHP2Installer\`): `Script` (reads and checks), `Vars`, `Session` (fetches a package), `Runner` (the steps, a little each frame), `Uninstaller`, `Download` (non-blocking HTTP), `Binary` (writes the address into an installer), `Stats` / `StatsReport` (statistics). Shared by all the others |
 | `games/installer/` | the installer: a JumPHP desktop app (`bin/jumphp app:export installer --linux --windows --macos`) |
 | `server/` | the web server (Symfony 7.4, MariaDB, FrankenPHP; `docker compose -f server/compose.yaml up -d --build`) |
 | `tools/package-release.php`, `tools/github-release.sh`, `.github/workflows/package.yml` | GitHub releases |

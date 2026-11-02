@@ -49,6 +49,15 @@ Mon-Appli-setup.exe --silent --folder="D:\Apps\Mon Appli" --no-option=desktop
 "%LOCALAPPDATA%\Programs\Mon Appli\uninstall.exe" --uninstall --silent
 ```
 
+## Statistiques
+
+Chaque installeur dit à l'adresse de statistiques de son paquet ce qui se passe : lancé, pages vues, annulé (sur
+quelle page ou pendant quelle étape), échoué (l'étape et l'erreur, sans les dossiers de l'utilisateur), installé,
+appli lancée à la fin, désinstallé. Le tableau de bord du paquet (serveur : **Statistics** ; jumphp.net : **Studio ›
+Installeurs › Statistiques**) montre les téléchargements, jusqu'où vont les gens, les échecs, par système, version et
+jour. Rien de personnel ; l'utilisateur peut refuser (`--no-stats`), le script peut n'en envoyer aucune
+(`stats: false`) ou les envoyer ailleurs (`stats: https://…`, utile sans serveur). Détails : [stats.md](stats.md).
+
 ## Un jeu ou une appli JumPHP
 
 `bin/jumphp app:export mon-appli --linux --windows --macos` (ou `export:standalone` pour un jeu) donne un exécutable

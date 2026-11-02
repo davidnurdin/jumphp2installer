@@ -28,6 +28,8 @@ Caddy, nginx) with https: forward to port 80 of `app` and set `JUMPHP2INSTALLER_
    see it (Refresh, or it follows your typing). Ctrl+S saves.
 3. Try it: the download links work for you before the package is published.
 4. **Published**: the download page (`/p/<id>`) and the installers work for everyone. Downloads are counted.
+5. **Statistics** (from the package, or the downloads in the list): downloads, runs, where people stop, failures and
+   their errors, by system, version and day ([stats.md](stats.md)).
 
 ## The API (what any server implements)
 
@@ -37,6 +39,7 @@ An installer only needs these, without an account (CORS open):
 |---|---|
 | `GET {server}/api/packages/{id}` | `{"id", "name", "script": "<the YAML>", "assets": "<address of its files>/"}`; 404: unknown or not published |
 | `GET {assets}/{path}` | a file of the package |
+| `POST {server}/api/packages/{id}/stats` | optional: what an installer tells (JSON, [stats.md](stats.md)); `204` |
 
 and to hand installers out:
 

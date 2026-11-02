@@ -51,7 +51,17 @@ Publishing a release is outward-facing: only when the user asked for it.
 
 `--silent [--folder=DIR] [--option=NAME] [--no-option=NAME]`, `--uninstall [--silent]`, `--check [--script=FILE]`,
 `--make=OUT --server=SOURCE [--package=ID] [--from=BASE]` (SOURCE: `github:owner/repo`, `https://host/folder/`, or a
-server + `--package`), `--version`, `--help`. Exit code 0 = done.
+server + `--package`), `--version`, `--help`. Exit code 0 = done. `--make ... --stats=URL`: the installer tells URL
+what happens; `--no-stats` / `JUMPHP2INSTALLER_STATS=off`: it tells nothing.
+
+## Statistics
+
+Installers tell started / pages seen / cancelled (where) / failed (step, error without the user's folders) /
+installed / launched / uninstalled, with version, system and a random run id (docs/installer/stats.md). Where: the
+script's `stats: https://…` (or `false`), else `--stats` / the executable's setting, else a server package's
+`{server}/api/packages/{id}/stats`; a GitHub-release package without `stats:` tells nothing. The owner reads them in
+the dashboard: server `/packages/{id}/stats`, jumphp.net Studio › Installers › Statistiques. To receive them on
+one's own site: `JumPHP2Installer\StatsReport::accept()` / `build()`.
 
 ## A server instead
 

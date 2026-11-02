@@ -39,6 +39,8 @@ steps:
   - shortcut: {target: "{folder}/myapp{exe}", where: menu}
     if: menu
   - uninstaller
+
+stats: https://example.com/stats   # optional: where the installer tells what happens (false: nowhere); stats.md
 ```
 
 The editor of the server checks the script as you type: each problem with its line (`line 12: steps[2]: unknown
@@ -109,6 +111,12 @@ A failing step stops the installation and shows its error and the details.
 
 What the install created is written to `{folder}/uninstall.json`; the uninstaller removes exactly that (files,
 folders left empty, shortcuts, the uninstall entry). A file the user added keeps its folder.
+
+## `stats`
+
+Where the installer tells what happens (started, the pages seen, cancelled, failed, installed, uninstalled): an
+`https://` address, or `false` for nowhere. Without it, a package of a server tells that server (its dashboard), and
+a package without a server tells nothing. [stats.md](stats.md).
 
 ## Variables
 

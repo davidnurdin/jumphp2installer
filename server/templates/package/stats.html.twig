@@ -1,0 +1,94 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ package.name }}: statistics · jumphp2installer{% endblock %}
+{% block body %}
+{% set t = report.totals %}
+<div class="stats">
+  <div class="stats-head">
+    <h1>{{ package.name }} <span class="muted">statistics</span></h1>
+    <span class="grow"></span>
+    <nav class="periods">
+      {% for d in [7, 30, 90, 365] %}<a href="?days={{ d }}" class="{{ d == days ? 'on' }}">{{ d }} days</a>{% endfor %}
+    </nav>
+    <a href="{{ path('package_edit', {id: package.id}) }}">Back to the package</a>
+  </div>
+  {% if not package.published %}<p class="box warn">Not published: installers tell nothing until it is (and the downloads are not counted).</p>{% endif %}
+
+  <div class="tiles">
+    <div class="tile"><b>{{ t.downloads }}</b><span>installers downloaded</span></div>
+    <div class="tile"><b>{{ t.starts }}</b><span>started</span>{% if t.silent %}<small>{{ t.silent }} silent</small>{% endif %}</div>
+    <div class="tile ok"><b>{{ t.installs }}</b><span>installed</span>{% if t.success is not null %}<small>{{ t.success }} % of the started</small>{% endif %}</div>
+    <div class="tile"><b>{{ t.cancels }}</b><span>cancelled</span></div>
+    <div class="tile bad"><b>{{ t.fails }}</b><span>failed</span></div>
+    <div class="tile"><b>{{ t.runs }}</b><span>launched at the end</span></div>
+    <div class="tile"><b>{{ t.uninstalls }}</b><span>uninstalled</span></div>
+    <div class="tile"><b>{{ t.medianSeconds is null ? '–' : t.medianSeconds ~ ' s' }}</b><span>median install time</span></div>
+  </div>
+
+  <div class="stats-grid">
+    <section class="box">
+      <h2>How far people go</h2>
+      <p class="muted">Of the {{ t.starts }} started, how many saw each page.</p>
+      <table class="list bars">
+        {% for f in report.funnel %}
+          <tr><td><code>{{ f.page }}</code></td><td class="num">{{ f.runs }}</td><td class="bar"><i style="width: {{ f.percent }}%"></i></td><td class="num muted">{{ f.percent }} %</td></tr>
+        {% else %}<tr><td class="muted">Nothing yet.</td></tr>{% endfor %}
+      </table>
+    </section>
+
+    <section class="box">
+      <h2>Where they cancelled</h2>
+      <table class="list">
+        <thead><tr><th>Page</th><th>During the step</th><th class="num">Runs</th></tr></thead>
+        {% for c in report.cancelled %}
+          <tr><td><code>{{ c.page ?: '?' }}</code></td><td>{{ c.step ? '<code>' ~ c.step ~ '</code>' : '' }}</td><td class="num">{{ c.runs }}</td></tr>
+        {% else %}<tr><td colspan="3" class="muted">No cancellation.</td></tr>{% endfor %}
+      </table>
+    </section>
+
+    <section class="box">
+      <h2>Failures</h2>
+      <table class="list">
+        <thead><tr><th>Step</th><th class="num">Runs</th></tr></thead>
+        {% for f in report.failed %}<tr><td><code>{{ f.step ?: '?' }}</code></td><td class="num">{{ f.runs }}</td></tr>
+        {% else %}<tr><td colspan="2" class="muted">No failure.</td></tr>{% endfor %}
+      </table>
+      {% if report.errors %}
+        <h3>The most frequent errors</h3>
+        <table class="list">
+          {% for e in report.errors %}<tr><td class="error-text">{{ e.error ?: '(no message)' }}</td><td class="num">{{ e.runs }}</td></tr>{% endfor %}
+        </table>
+      {% endif %}
+    </section>
+
+    {% for title, rows in {'By system': report.systems, 'By version': report.versions} %}
+    <section class="box wide">
+      <h2>{{ title }}</h2>
+      <table class="list">
+        <thead><tr><th></th><th class="num">Downloaded</th><th class="num">Started</th><th class="num">Installed</th><th class="num">Cancelled</th><th class="num">Failed</th><th class="num">Uninstalled</th></tr></thead>
+        {% for r in rows %}
+          <tr><td><code>{{ r.key }}</code></td><td class="num">{{ r.downloads }}</td><td class="num">{{ r.starts }}</td><td class="num">{{ r.installs }}</td><td class="num">{{ r.cancels }}</td><td class="num">{{ r.fails }}</td><td class="num">{{ r.uninstalls }}</td></tr>
+        {% else %}<tr><td colspan="7" class="muted">Nothing yet.</td></tr>{% endfor %}
+      </table>
+    </section>
+    {% endfor %}
+  </div>
+
+  <section class="box">
+    <h2>Day by day</h2>
+    {% set top = max(1, max(report.daily|map(d => max(d.download, d.start)))) %}
+    <div class="days">
+      {% for d in report.daily %}
+        <div class="day" title="{{ d.day }}: {{ d.download }} downloaded, {{ d.start }} started, {{ d.install }} installed, {{ d.cancel }} cancelled, {{ d.fail }} failed">
+          <i class="dl" style="height: {{ (100 * d.download / top)|round(1) }}%"></i><i class="st" style="height: {{ (100 * d.start / top)|round(1) }}%"></i><i class="in" style="height: {{ (100 * d.install / top)|round(1) }}%"></i>
+        </div>
+      {% endfor %}
+    </div>
+    <p class="legend muted"><i class="dl"></i> downloaded <i class="st"></i> started <i class="in"></i> installed · {{ report.daily|first.day }} → {{ report.daily|last.day }}</p>
+  </section>
+
+  <p class="muted">What installers tell: started, the pages seen, cancelled, failed (the step and its error, without the
+    user's folders), installed, launched, uninstalled; with the version, the system and a random id of each run, nothing
+    personal. A user can refuse (<code>--no-stats</code>), a script can send none (<code>stats: false</code>) or send them
+    elsewhere (<code>stats: https://…</code>).</p>
+</div>
+{% endblock %}

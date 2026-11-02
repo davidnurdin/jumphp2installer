@@ -79,6 +79,20 @@ final class PackageController extends AbstractController
         return $this->json(['problems' => $script->problems(), 'missing' => $missing]);
     }
 
+    /** The dashboard: what its installers did (downloads, runs, where people stopped, the errors). */
+    #[Route('/{id}/stats', name: 'package_stats', methods: ['GET'])]
+    public function stats(string $id, Request $request, \App\Repository\InstallEventRepository $events): Response
+    {
+        $package = $this->mine($id);
+        $days = in_array($d = $request->query->getInt('days', 30), [7, 30, 90, 365], true) ? $d : 30;
+        $rows = $events->rowsOf($package, new \DateTimeImmutable('-' . ($days - 1) . ' days'));
+        return $this->render('package/stats.html.twig', [
+            'package' => $package,
+            'days' => $days,
+            'report' => \JumPHP2Installer\StatsReport::build($rows, \JumPHP2Installer\StatsReport::pagesOf($package->getScript()), min($days, 90)),
+        ]);
+    }
+
     #[Route('/{id}/save', name: 'package_save', methods: ['POST'])]
     public function save(string $id, Request $request): JsonResponse
     {

@@ -21,7 +21,7 @@
       <td><a href="{{ path('package_edit', {id: p.id}) }}">{{ p.name }}</a></td>
       <td><code>{{ p.id }}</code></td>
       <td>{% if p.published %}<span class="tag ok">published</span>{% else %}<span class="tag">draft</span>{% endif %}</td>
-      <td>{{ p.downloads }}</td>
+      <td><a href="{{ path('package_stats', {id: p.id}) }}" title="Statistics">{{ p.downloads }}</a></td>
       <td class="muted">{{ p.updatedAt|date('Y-m-d H:i') }}</td>
     </tr>
   {% endfor %}

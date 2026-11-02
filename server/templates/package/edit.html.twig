@@ -53,6 +53,7 @@
           <li class="warn">No base installer on this server yet: <code>bin/console app:installers:fetch</code></li>
         {% endfor %}
         <li>API: <a href="{{ path('api_package', {id: package.id}) }}" target="_blank"><code>/api/packages/{{ package.id }}</code></a></li>
+        <li><a href="{{ path('package_stats', {id: package.id}) }}">Statistics</a>: downloads, installs, where people stop, the errors ({{ package.downloads }} downloads)</li>
       </ul>
       <p class="muted">Not published, only you can open these (signed in): try your installer before publishing it.</p>
     </details>

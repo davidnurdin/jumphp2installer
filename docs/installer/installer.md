@@ -35,8 +35,10 @@ setup --silent [--folder=DIR] [--option=NAME] [--no-option=NAME]
                                        installs with the defaults, prints the steps; exit 0 = installed
 setup --check [--script=install.yaml]  reads the package, says what is wrong
 uninstall --uninstall --silent         removes the app (Windows: QuietUninstallString does this)
-setup --make=OUT --server=SOURCE [--package=ID] [--from=BASE]
-                                       writes an installer of SOURCE (a copy of this one, or of BASE)
+setup --make=OUT --server=SOURCE [--package=ID] [--from=BASE] [--stats=URL]
+                                       writes an installer of SOURCE (a copy of this one, or of BASE),
+                                       that tells URL what happens (stats.md)
+setup --no-stats ...                   tells nothing (or JUMPHP2INSTALLER_STATS=off)
 setup --version | --help
 ```
 
@@ -50,6 +52,8 @@ setup --version | --help
   entry on Linux, `Uninstall My App.app` on macOS.
 - The uninstaller removes what the install made, folders left empty, shortcuts, the entry; files the user added
   stay. On Windows the `.exe` deletes itself a moment after it quits.
+- Tells its statistics address what happens (started, pages, cancelled, failed, installed, uninstalled), without
+  blocking and without anything personal: [stats.md](stats.md).
 - The first launch unpacks the installer's own PHP code into the user's cache (`~/.cache/jumphp`,
   `%LOCALAPPDATA%\JumPHP`, `~/Library/Caches/JumPHP`).
 
