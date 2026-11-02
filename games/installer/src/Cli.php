@@ -20,7 +20,7 @@ use JumPHP2Installer\Uninstaller;
  */
 final class Cli
 {
-    public const VERSION = '0.2.6';
+    public const VERSION = '0.2.7';
 
     /** @var resource|null where it writes (tests: php://memory), STDOUT / STDERR when null */
     public static $output = null;

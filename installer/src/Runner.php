@@ -440,12 +440,17 @@ final class Runner
                     $exe = $folder . '/Uninstall ' . $this->vars->get('app') . '.app';
                     self::remove($exe);
                     $this->copyTree(Binary::readable($bundle), $exe, false);
+                    // a standalone installer: its uninstaller without the app inside (each of the .app's executables)
+                    foreach (glob("$exe/Contents/MacOS/*") ?: [] as $program) {
+                        is_file($program) && Binary::stripFile($program);
+                    }
                 } else {
                     $exe = $folder . DIRECTORY_SEPARATOR . 'uninstall' . $this->vars->get('exe');
                     if (!@copy(Binary::readable($self), $exe)) {
                         throw new \RuntimeException("cannot write $exe");
                     }
                     PHP_OS_FAMILY !== 'Windows' && @chmod($exe, 0755);
+                    Binary::stripFile($exe);        // a standalone installer: its uninstaller without the app inside
                 }
             } else {
                 $this->log[] = '  (no installer executable to copy: the uninstall entry is written without it)';

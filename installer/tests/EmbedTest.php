@@ -44,6 +44,24 @@ final class EmbedTest extends TestCase
         unset($read);
         \Phar::unlinkArchive("$dir/check.phar");
 
+        // its uninstaller: the same installer without the package, still a valid (signed) PHAR, a build of its own
+        self::assertNull(Binary::withoutPayload($head . $bytes));
+        $lean = (string)Binary::withoutPayload($out);
+        self::assertStringStartsWith($head, $lean);
+        self::assertLessThan(strlen($out), strlen($lean));
+        file_put_contents("$dir/lean.phar", substr($lean, strlen($head)));
+        $read = new \Phar("$dir/lean.phar");
+        self::assertFalse(isset($read['game/payload/install.yaml']));
+        self::assertSame('<?php echo 1;', file_get_contents($read['game/app.php']->getPathname()));
+        self::assertMatchesRegularExpression("/JUMPHP_GAME_BUILD = 'abcdef123456-[0-9a-f]{12}u'/", $read->getStub());
+        self::assertNotNull($read->getSignature());
+        unset($read);
+        \Phar::unlinkArchive("$dir/lean.phar");
+        copy("$dir/setup", "$dir/uninstall");
+        self::assertTrue(Binary::stripFile("$dir/uninstall"));
+        self::assertSame($lean, file_get_contents("$dir/uninstall"));
+        self::assertFalse(Binary::stripFile("$dir/uninstall"));      // nothing left to take out
+
         $this->expectExceptionMessage('no install.yaml');
         Binary::embedFile("$dir/base", "$dir/setup3", "$dir/images");
     }

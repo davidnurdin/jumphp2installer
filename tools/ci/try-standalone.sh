@@ -16,6 +16,15 @@ folder="$work/installed/CI Standalone"
 "$setup" --silent --folder="$folder"
 grep -q "hello from the standalone app" "$folder/bin/hello.txt"
 grep -q "CI Standalone 3.0.0 on $os" "$folder/version.txt"
+# the uninstaller is the installer without the app inside it (Binary::withoutPayload())
+case "$os" in
+  windows) u="$folder/uninstall.exe" ;;
+  macos) u="$folder/Uninstall CI Standalone.app/Contents/MacOS/jumphp2installer" ;;
+  linux) u="$folder/uninstall" ;;
+esac
+size() { cat "$(dirname "$1")"/* | wc -c; }     # macOS: every executable of the .app (one per processor)
+[ "$os" = macos ] || size() { wc -c < "$1"; }
+[ "$(size "$u")" -lt "$(size "$setup")" ] || { echo "the uninstaller still holds the package"; exit 1; }
 case "$os" in
   windows) "$folder/uninstall.exe" --uninstall --silent; sleep 5 ;;
   macos) "$folder/Uninstall CI Standalone.app/Contents/MacOS/jumphp2installer" --silent ;;

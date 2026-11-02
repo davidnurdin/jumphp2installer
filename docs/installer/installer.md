@@ -78,7 +78,7 @@ php -d phar.readonly=0 tools/make-installer.php jumphp2installer-windows-x86_64.
 `JumPHP2Installer\Binary::embedFile($base, $out, $folder)` (with `phar.readonly=0`): the folder is added to the
 installer's PHAR (`game/payload/`), its stub gets a build of its own; the base installer's micro and php.ini section
 do not move. Works for the three systems (macOS: the `.zip` of the app, its executables rewritten inside). JumPHP:
-`bin/jumphp installer <game> --standalone`. The uninstaller it writes is a copy of it (the package inside too).
+`bin/jumphp installer <game> --standalone`. The uninstaller it writes is a copy of it without the package (`Binary::withoutPayload()`, since 0.2.7).
 
 ## Building it
 
