@@ -8,9 +8,9 @@ use JumPHP2Installer\Uninstaller;
 
 /**
  * Where this run's package comes from, the first found of:
- *
  *   --script=install.yaml, env JUMPHP2INSTALLER_SCRIPT       a local script (authors, tests), its files next to it
  *   --uninstall, or a manifest next to this executable        the uninstaller of an install (uninstall.json)
+ *   payload/install.yaml in itself                            a standalone installer (Binary::embedFile()): no network
  *   --server= / env JUMPHP2INSTALLER_SERVER / the executable's php.ini section (jumphp2installer.server) / DEFAULT_SERVER
  *   --package= / env JUMPHP2INSTALLER_PACKAGE / its php.ini section (jumphp2installer.package) / its file name (-setup-<id>)
  *   --download= / env JUMPHP2INSTALLER_DOWNLOAD / its file name ("My-App-k3x9p2qa7m4z.exe", Binary::fileName()):
@@ -65,6 +65,11 @@ final class Source
         $exe = self::executable();
         if (in_array('--uninstall', $args, true) || ($exe !== null && (preg_match('/^uninstall/i', basename($exe)) || preg_match('#/Uninstall [^/]*\.app/Contents/MacOS/#', $exe)))) {
             return new self('uninstall', manifest: $exe !== null ? Uninstaller::find($exe) : null);
+        }
+        // a standalone installer (Binary::embedFile()): the package inside it, no network, no server
+        $root = defined('JUMPHP_ROOT') ? (string)constant('JUMPHP_ROOT') : '';
+        if ($root !== '' && $opt('server') === null && $opt('package') === null && is_file("$root/" . Binary::PAYLOAD . '/install.yaml')) {
+            return new self('local', script: "$root/" . Binary::PAYLOAD . '/install.yaml');
         }
         $server = $opt('server') ?? $setting('JUMPHP2INSTALLER_SERVER', 'jumphp2installer.server') ?? self::DEFAULT_SERVER;
         $package = $opt('package') ?? $setting('JUMPHP2INSTALLER_PACKAGE', 'jumphp2installer.package')

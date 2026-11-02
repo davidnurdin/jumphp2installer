@@ -19,7 +19,7 @@ jobs:
           extensions: zip, mbstring
       - name: The library's tests
         working-directory: installer
-        run: composer install -q && vendor/bin/phpunit
+        run: composer install -q && php -d phar.readonly=0 vendor/bin/phpunit
 
   export:
     runs-on: ubuntu-latest
@@ -36,10 +36,15 @@ jobs:
           cp games/installer/dist/standalone/installer-windows-x86_64.exe out/jumphp2installer-windows-x86_64.exe
           cp games/installer/dist/standalone/installer-macos.zip out/jumphp2installer-macos.zip
           ls -la out
+          tools/ci/make-standalone.sh out out-standalone
       - uses: actions/upload-artifact@v4
         with:
           name: installers
           path: out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standalone
+          path: out-standalone/
 
   try:
     needs: export
@@ -67,6 +72,17 @@ jobs:
             *) base=installers/jumphp2installer-linux-x86_64; chmod +x "$base" ;;
           esac
           tools/ci/try-installer.sh "$base"
+      - uses: actions/download-artifact@v4
+        with:
+          name: standalone
+          path: standalone
+      - name: A standalone installer (the package inside it, no server)
+        run: |
+          case "${{ runner.os }}" in
+            Windows) tools/ci/try-standalone.sh standalone/ci-standalone-windows-x86_64.exe ;;
+            macOS) tools/ci/try-standalone.sh standalone/ci-standalone-macos.zip ;;
+            *) tools/ci/try-standalone.sh standalone/ci-standalone-linux-x86_64 ;;
+          esac
       - name: The window (its page loads, PHP answers)
         env:
           JUMPHP_SMOKE: '1'

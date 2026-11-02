@@ -104,6 +104,101 @@ final class Binary
         return $out;
     }
 
+    /** The folder of a package inside a standalone installer (embed()), unpacked with the installer itself. */
+    public const PAYLOAD = 'payload';
+
+    /**
+     * A standalone installer: $folder (install.yaml and the files it uses: the app's executable...) put inside the
+     * installer's PHAR (game/payload/), so it installs with no network and no server (Source: the package beside
+     * itself). The PHAR is rewritten with PHP's Phar (php -d phar.readonly=0) and a stub of its own build (the
+     * unpacked copy of a plain installer is not taken for this one). An executable (Linux, Windows) or the .zip of the
+     * macOS app (its executables inside). Writes $out.
+     */
+    public static function embedFile(string $in, string $out, string $folder): void
+    {
+        if (!is_file("$folder/install.yaml")) {
+            throw new \RuntimeException("$folder has no install.yaml");
+        }
+        if (filter_var(ini_get('phar.readonly'), FILTER_VALIDATE_BOOL)) {
+            throw new \RuntimeException('a standalone installer is made with php -d phar.readonly=0');
+        }
+        $data = @file_get_contents(self::readable($in));
+        if ($data === false) {
+            throw new \RuntimeException("cannot read $in");
+        }
+        if (!str_starts_with($data, "PK\x03\x04")) {
+            if (@file_put_contents($out, self::embed($data, $folder)) === false) {
+                throw new \RuntimeException("cannot write $out");
+            }
+            @chmod($out, 0755);
+            return;
+        }
+        unset($data);
+        $done = Zip::rewrite($in, $out, static function (string $name, string $bytes) use ($folder): ?string {
+            if (!preg_match('#\\.app/Contents/MacOS/[^/]+$#', $name)) {
+                return null;
+            }
+            try {
+                return self::embed($bytes, $folder);
+            } catch (\RuntimeException) {
+                return null;    // another program of the app (not the installer)
+            }
+        });
+        if ($done === 0) {
+            @unlink($out);
+            throw new \RuntimeException("$in: no installer executable in this macOS app");
+        }
+    }
+
+    /** embedFile() on the bytes of an executable: micro + ini section stay, the PHAR after them is rewritten. */
+    public static function embed(string $binary, string $folder): string
+    {
+        [$offset, $length] = self::section($binary);
+        $start = $offset + 8 + $length;
+        $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'j2i-embed-' . getmypid() . '-' . bin2hex(random_bytes(4));
+        @mkdir($tmp, 0700, true);
+        $file = "$tmp/installer.phar";
+        try {
+            file_put_contents($file, substr($binary, $start));
+            $files = [];
+            $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($folder, \FilesystemIterator::SKIP_DOTS));
+            foreach ($it as $f) {
+                if ($f->isFile()) {
+                    $files[str_replace('\\', '/', substr($f->getPathname(), strlen(rtrim($folder, '/\\')) + 1))] = $f->getPathname();
+                }
+            }
+            ksort($files);
+            $hash = hash_init('sha256');
+            foreach ($files as $name => $path) {
+                hash_update($hash, $name . "\0");
+                hash_update_file($hash, $path);
+            }
+            $phar = new \Phar($file);
+            $phar->startBuffering();
+            foreach ($files as $name => $path) {
+                $phar->addFile($path, 'game/' . self::PAYLOAD . '/' . $name);
+            }
+            // its own build: the stub unpacks into <cache>/<id>-<build>, which a plain installer of the same base has
+            $stub = (string)preg_replace_callback("/(JUMPHP_GAME_BUILD = ')([^']*)(')/", static fn (array $m): string =>
+                $m[1] . substr($m[2], 0, 12) . '-' . substr(hash_final($hash), 0, 12) . $m[3], $phar->getStub(), 1, $count);
+            if ($count !== 1) {
+                throw new \RuntimeException('not an installer executable (its PHAR has no JumPHP stub)');
+            }
+            $phar->setStub($stub);
+            $phar->stopBuffering();
+            unset($phar);
+            return substr($binary, 0, $start) . file_get_contents($file);
+        } finally {
+            // Phar keeps the archive (and its alias, jumphp-game.phar) known until it is unlinked: the next one would clash
+            try {
+                is_file($file) && \Phar::unlinkArchive($file);
+            } catch (\Throwable) {
+            }
+            @unlink($file);
+            @rmdir($tmp);
+        }
+    }
+
     /** A download's id (Binary::fileName($name, $package, $platform, $download)): 12 letters and digits. */
     public const DOWNLOAD = '[a-z0-9]{12}';
 

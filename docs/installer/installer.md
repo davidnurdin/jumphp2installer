@@ -22,13 +22,15 @@ The first of:
 1. `--script=install.yaml` (or env `JUMPHP2INSTALLER_SCRIPT`): a local script, its files next to it (authors);
 2. `--uninstall`, or a program named `uninstall…` (or inside `Uninstall … .app`): the uninstaller of the install whose
    folder holds it (`uninstall.json`);
-3. the server: `--server=`, env `JUMPHP2INSTALLER_SERVER`, the address written into the executable
+3. the package inside it (a **standalone installer**, below): `payload/install.yaml`, unless `--server` / `--package`
+   are given;
+4. the server: `--server=`, env `JUMPHP2INSTALLER_SERVER`, the address written into the executable
    (`jumphp2installer.server` in its php.ini section), else `https://jumphp.net/installers`;
    the package: `--package=`, env `JUMPHP2INSTALLER_PACKAGE`, the id written into it, else the id in its file name
    (`…-setup-<id>`, even renamed `… (1).exe`); the download: `--download=`, env `JUMPHP2INSTALLER_DOWNLOAD`, else the id at
    the end of its file name (`My-App-k3x9p2qa7m4z (1).exe`; macOS: of its `.app`). A file renamed without it still
    installs (the package id written into it), only uncounted as that download;
-4. a server `github:owner/repo`, `github:owner/repo@tag` or `https://host/folder/` (package `static`): `install.yaml`
+5. a server `github:owner/repo`, `github:owner/repo@tag` or `https://host/folder/` (package `static`): `install.yaml`
    and its files at that address (GitHub: the newest release).
 
 ## Command line
@@ -60,6 +62,23 @@ setup --version | --help
   blocking and without anything personal: [stats.md](stats.md).
 - The first launch unpacks the installer's own PHP code into the user's cache (`~/.cache/jumphp`,
   `%LOCALAPPDATA%\JumPHP`, `~/Library/Caches/JumPHP`).
+
+## A standalone installer: the package inside it
+
+No server, no network: the package (`install.yaml` and every file it uses, the app's executable included) goes inside
+the installer, which then installs it from itself. One file per system to give (USB key, a shop, a company's
+network); nothing is downloaded and nothing says when a newer version exists (unless the script's `version` points
+somewhere).
+
+```bash
+php -d phar.readonly=0 tools/make-installer.php jumphp2installer-windows-x86_64.exe "My-App-setup.exe" --standalone my-package/
+```
+
+`my-package/` holds `install.yaml` and its files; its `download:` steps name them (`download: my-app.exe`). In PHP:
+`JumPHP2Installer\Binary::embedFile($base, $out, $folder)` (with `phar.readonly=0`): the folder is added to the
+installer's PHAR (`game/payload/`), its stub gets a build of its own; the base installer's micro and php.ini section
+do not move. Works for the three systems (macOS: the `.zip` of the app, its executables rewritten inside). JumPHP:
+`bin/jumphp installer <game> --standalone`. The uninstaller it writes is a copy of it (the package inside too).
 
 ## Building it
 
