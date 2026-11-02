@@ -28,6 +28,7 @@ steps:
   - write: {file: "{folder}/version.txt", text: "{app} {version} on {os}"}
   - shortcut: {target: "{folder}/version.txt", name: "CI App", where: desktop}
     if: desktop
+  - command: "{folder}/bin/hello.txt"
   - uninstaller
 YAML
 port=$((20000 + RANDOM % 20000))
@@ -61,6 +62,12 @@ folder="$work/installed/CI App"
 test -f "$folder/bin/hello.txt"
 grep -q "CI App 1.0.0 on $os" "$folder/version.txt"
 test -f "$folder/uninstall.json"
+# the command: Windows, its folder in the user's Path; elsewhere a link in ~/.local/bin
+userpath() { powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path', 'User')"; }
+case "$os" in
+  windows) userpath | grep -qi 'CI App' ;;
+  *) test -L "$HOME/.local/bin/hello.txt" ;;
+esac
 case "$os" in
   windows)
     test -f "$folder/uninstall.exe"
@@ -83,4 +90,8 @@ case "$os" in
     ;;
 esac
 if [ -e "$folder" ]; then echo "left behind:"; ls -laR "$folder"; exit 1; fi
+case "$os" in
+  windows) if userpath | grep -qi 'CI App'; then echo "the Path still has the folder"; exit 1; fi ;;
+  *) ! test -e "$HOME/.local/bin/hello.txt" ;;
+esac
 echo "==> $os: installed, then uninstalled, nothing left"

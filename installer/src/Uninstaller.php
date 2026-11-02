@@ -31,6 +31,9 @@ final class Uninstaller
         foreach ((array)($manifest['files'] ?? []) as $p) {
             $this->todo[] = ['file', (string)$p];
         }
+        foreach (PHP_OS_FAMILY === 'Windows' ? (array)($manifest['path'] ?? []) : [] as $dir) {
+            $this->todo[] = ['path', (string)$dir];
+        }
         if (($manifest['registry'] ?? null) && PHP_OS_FAMILY === 'Windows') {
             $this->todo[] = ['registry', (string)$manifest['registry']];
         }
@@ -105,6 +108,9 @@ final class Uninstaller
                     break;
                 case 'registry':
                     $this->commands[] = new Command(['reg.exe', 'delete', $path, '/f']);
+                    return false;
+                case 'path':        // the folder a `command` step put in the user's Path
+                    $this->commands[] = new Command(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', Runner::pathScript($path, false)]);
                     return false;
             }
         }

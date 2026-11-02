@@ -162,6 +162,7 @@ final class Runner
             'mkdir' => $this->stepMkdir($step),
             'write' => $this->stepWrite($step),
             'executable' => $this->stepExecutable($step),
+            'command' => $this->stepCommand($step),
             'delete' => $this->stepDelete($step),
             'shortcut' => $this->stepShortcut($step),
             'run' => $this->stepRun($step),
@@ -326,6 +327,73 @@ final class Runner
             @chmod($path, 0755);
         }
         return true;
+    }
+
+    /**
+     * A program the user types by its name in a terminal: Windows, its folder added to the user's Path (and taken
+     * out by the uninstaller); Linux and macOS, a link in ~/.local/bin (that folder added to the shell's profile
+     * when the PATH does not have it: ~/.profile, macOS ~/.zprofile; the line stays after an uninstall).
+     */
+    private function stepCommand(array $step): bool
+    {
+        $path = $this->vars->path($step['path']);
+        if ($this->fraction === 0.0) {
+            $this->fraction = 0.01;
+            if (!file_exists($path)) {
+                throw new \RuntimeException("command: no file $path");
+            }
+            if (Vars::os() === 'windows') {
+                $dir = dirname($path);
+                $this->manifest['path'][] = $dir;
+                $this->commands[] = new Command(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', self::pathScript($dir, true)]);
+                $this->log[] = "  $dir added to the user's Path (new terminals)";
+            } else {
+                $bin = $this->vars->get('home') . '/.local/bin';
+                $this->makeDir($bin, false);
+                $link = $bin . '/' . preg_replace('/\.exe$/i', '', basename($path));
+                if (is_link($link) || is_file($link)) {
+                    @unlink($link);
+                }
+                if (!@symlink($path, $link)) {
+                    throw new \RuntimeException("command: cannot write $link");
+                }
+                $this->manifest['shortcuts'][] = $link;
+                $this->log[] = '  ' . basename($link) . ": $link";
+                $paths = explode(':', (string)getenv('PATH'));
+                if (!in_array($bin, $paths, true) && !in_array(rtrim($bin, '/') . '/', $paths, true)) {
+                    $profile = $this->vars->get('home') . (Vars::os() === 'macos' ? '/.zprofile' : '/.profile');
+                    $text = (string)@file_get_contents($profile);
+                    if (!str_contains($text, '.local/bin')) {
+                        @file_put_contents($profile, rtrim($text, "\n") . ($text !== '' ? "\n" : '') . "export PATH=\"\$HOME/.local/bin:\$PATH\"   # jumphp2installer\n");
+                        $this->log[] = "  ~/.local/bin added to the PATH in $profile (new terminals)";
+                    }
+                }
+            }
+            if ($this->commands === []) {
+                return true;
+            }
+        }
+        foreach ($this->commands as $c) {
+            if (!$c->isDone()) {
+                return false;
+            }
+        }
+        foreach ($this->commands as $c) {
+            if (!$c->ok()) {
+                $this->log[] = '  the Path: ' . trim(substr($c->output, -300));
+            }
+        }
+        $this->commands = [];
+        return true;
+    }
+
+    /** PowerShell that adds a folder to the user's Path (or takes it out), keeping the rest as it is. */
+    public static function pathScript(string $dir, bool $add): string
+    {
+        $q = "'" . str_replace("'", "''", $dir) . "'";
+        $read = "\$p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (\$p -eq \$null) { \$p = '' }; \$list = @(\$p -split ';' | Where-Object { \$_ -ne '' -and \$_ -ne $q });";
+        $write = "[Environment]::SetEnvironmentVariable('Path', ((\$list" . ($add ? " + $q" : '') . ") -join ';'), 'User')";
+        return "$read $write";
     }
 
     private function stepDelete(array $step): bool
@@ -661,6 +729,7 @@ final class Runner
             'mkdir' => 'Making ' . basename((string)$step['path']),
             'write' => 'Writing ' . basename((string)$step['file']),
             'executable' => 'Preparing ' . basename((string)$step['path']),
+            'command' => 'Making ' . basename((string)$step['path']) . ' a command',
             'delete' => 'Removing ' . basename((string)$step['path']),
             'shortcut' => 'Making the shortcuts',
             'run' => 'Running ' . basename(strtok((string)$step['command'], ' ') ?: ''),

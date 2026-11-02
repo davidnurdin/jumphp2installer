@@ -34,7 +34,7 @@ final class Script
 {
     public const FORMAT = 1;
     public const PAGES = ['welcome', 'license', 'folder', 'options', 'install', 'finish'];
-    public const STEPS = ['download', 'extract', 'copy', 'mkdir', 'write', 'executable', 'shortcut', 'run', 'delete', 'uninstaller'];
+    public const STEPS = ['download', 'extract', 'copy', 'mkdir', 'write', 'executable', 'command', 'shortcut', 'run', 'delete', 'uninstaller'];
     public const SYSTEMS = ['windows', 'linux', 'macos'];
 
     /** @var list<Problem> */
@@ -341,6 +341,7 @@ final class Script
                     break;
                 case 'mkdir':
                 case 'executable':
+                case 'command':
                 case 'delete':
                     $v = $map('path');
                     if (!is_string($v['path'] ?? null) || $v['path'] === '') {

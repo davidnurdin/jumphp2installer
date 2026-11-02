@@ -125,6 +125,38 @@ final class RunnerTest extends TestCase
         self::assertFileExists("$this->root/home/Desktop/mine.txt");       // not the install's
     }
 
+    public function testACommandIsLinkedInLocalBinAndTheProfileGetsIt(): void
+    {
+        $package = $this->package("app: {name: Hello}\nsteps:\n  - download: hello.zip\n  - extract: {strip: 1}\n  - command: \"{folder}/hello\"\n  - uninstaller\n");
+        $runner = new Runner($package, $this->vars($package), null, "$this->pkg/self.bin");
+        self::assertTrue($runner->runAll(), implode("\n", $runner->log));
+        $folder = "$this->root/home/opt/Hello";
+        $link = "$this->root/home/.local/bin/hello";
+        self::assertTrue(is_link($link));
+        self::assertSame("$folder/hello", readlink($link));
+        // the PATH of this test has no <home>/.local/bin: the profile gets it, once
+        self::assertStringContainsString('export PATH="$HOME/.local/bin:$PATH"', (string)file_get_contents("$this->root/home/.profile"));
+
+        (new Uninstaller(Uninstaller::find($folder) ?? [], "$folder/uninstall"))->runAll();
+        self::assertFalse(is_link($link) || file_exists($link));
+        self::assertDirectoryDoesNotExist($folder);
+        self::assertFileExists("$this->root/home/.profile");      // the PATH line stays (other commands may use it)
+
+        // a profile that already has it is left as it is
+        file_put_contents("$this->root/home/.profile", "PATH=\"\$HOME/.local/bin:\$PATH\"\n");
+        self::assertTrue((new Runner($package, $this->vars($package), null, "$this->pkg/self.bin"))->runAll());
+        self::assertSame("PATH=\"\$HOME/.local/bin:\$PATH\"\n", file_get_contents("$this->root/home/.profile"));
+    }
+
+    public function testThePathScriptAddsAndTakesOutOnlyItsFolder(): void
+    {
+        $add = Runner::pathScript("C:\\Users\\o'brien\\Apps\\Todo", true);
+        self::assertStringContainsString("'C:\\Users\\o''brien\\Apps\\Todo'", $add);
+        self::assertStringContainsString("GetEnvironmentVariable('Path', 'User')", $add);
+        self::assertStringContainsString("+ 'C:", $add);
+        self::assertStringNotContainsString('+ ', Runner::pathScript('C:\\X', false));
+    }
+
     public function testAFileTheUserAddedKeepsItsFolder(): void
     {
         $package = $this->package("app: {name: Hello}\nsteps:\n  - download: hello.zip\n  - extract: {strip: 1}\n  - uninstaller\n");
