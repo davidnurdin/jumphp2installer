@@ -123,13 +123,15 @@ final class Runner
     }
 
     /** Runs everything at once (the command line). */
-    public function runAll(?callable $onStep = null): bool
+    /** @param callable|null $always called at every turn (the statistics' sending: their POSTs time out when nobody moves them) */
+    public function runAll(?callable $onStep = null, ?callable $always = null): bool
     {
         $last = '';
         while (!$this->tick(50.0)) {
             if ($onStep && $this->label !== $last) {
                 $onStep($last = $this->label);
             }
+            $always && $always();
             usleep(2000);
         }
         return $this->error === null;

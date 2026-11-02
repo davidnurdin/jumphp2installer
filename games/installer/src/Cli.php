@@ -20,7 +20,7 @@ use JumPHP2Installer\Uninstaller;
  */
 final class Cli
 {
-    public const VERSION = '0.2.2';
+    public const VERSION = '0.2.3';
 
     /** @var resource|null where it writes (tests: php://memory), STDOUT / STDERR when null */
     public static $output = null;
@@ -140,12 +140,11 @@ final class Cli
         $runner = $session->install($folder, $options, Source::executable());
         $runner->stats = $stats->forManifest();
         $printed = 0;
-        $ok = $runner->runAll(function () use ($runner, $stats, &$printed): void {
-            $stats->tick();
+        $ok = $runner->runAll(function () use ($runner, &$printed): void {
             for (; $printed < count($runner->log); $printed++) {
                 $this->out($runner->log[$printed]);
             }
-        });
+        }, fn () => $stats->tick(1.0));
         for (; $printed < count($runner->log); $printed++) {
             $this->out($runner->log[$printed]);
         }
