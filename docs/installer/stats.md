@@ -33,7 +33,7 @@ still on the way.
 | `event` | `start`, `page`, `cancel`, `fail`, `install`, `run`, `uninstall` |
 | `package`, `app`, `version` | the package's id, the script's `app.id`, the version installed |
 | `os`, `arch`, `installer` | the system, its architecture, the installer's own version |
-| `install` | a random id of this run (the same for all its events, and for its uninstall later) |
+| `install` | an anonymous id of this computer for this package (since 0.2.2): a hash of the system's machine id (Linux `/etc/machine-id`, Windows `MachineGuid`, macOS `IOPlatformUUID`) with the statistics address, so the system's id never leaves the computer and two packages can not be linked; a random id kept in the user's data folder when the system has none. The same for every run on this computer (two computers count two installs, installing again counts once, jumphp.net's installer and a GitHub release's setup of the same package count one computer once) and for its uninstall later. Never the IP address (computers at home share one) |
 | `mode` | `window` (the wizard) or `silent` |
 | `page` | `page` and `cancel`: the wizard's page (`welcome`, `license`, `folder`, `options`, `install`, `finish`) |
 | `step` | `fail` and `cancel`: the step under way (`download`, `extract`…) |
