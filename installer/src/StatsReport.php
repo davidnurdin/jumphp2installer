@@ -9,11 +9,13 @@ namespace JumPHP2Installer;
  *
  * A kept event (a row): event, install, os, arch, version, installer, mode, page, step, error, seconds, day (Y-m-d).
  * The server adds its own 'download' rows (an installer generated and downloaded, os = its platform) and, for a
- * download, install = ''.
+ * download, install = ''. download: the id of the download an installer comes from (Binary::fileName()), on the
+ * server's 'download' row, on its 'fetch' rows (that installer fetched its package: it is being run) and on the
+ * events of its runs.
  */
 final class StatsReport
 {
-    public const KEPT = ['event', 'install', 'os', 'arch', 'version', 'installer', 'mode', 'page', 'step', 'error', 'seconds'];
+    public const KEPT = ['event', 'download', 'install', 'os', 'arch', 'version', 'installer', 'mode', 'page', 'step', 'error', 'seconds'];
 
     /**
      * An event as a server keeps it, or null when it is not one (a wrong body, an unknown event).
@@ -38,6 +40,7 @@ final class StatsReport
         $seconds = is_numeric($body['seconds'] ?? null) ? max(0.0, min(86400.0, round((float)$body['seconds'], 1))) : null;
         return [
             'event' => $body['event'],
+            'download' => is_string($body['download'] ?? null) && preg_match('/^' . Binary::DOWNLOAD . '$/', $body['download']) ? $body['download'] : null,
             'install' => $body['install'],
             'os' => in_array($body['os'] ?? null, Script::SYSTEMS, true) ? $body['os'] : 'other',
             'arch' => $text($body['arch'] ?? null, 16) ?? '',
@@ -64,15 +67,25 @@ final class StatsReport
     {
         $runs = [];             // install id => what it did
         $downloads = [];        // os => n
+        $fetched = [];          // download id => true: its installer was run
+        $installedDownloads = [];   // download id => true: its installer installed
         $daily = [];
         foreach ($rows as $r) {
             $event = (string)($r['event'] ?? '');
             $day = (string)($r['day'] ?? '');
             $os = (string)($r['os'] ?? 'other');
+            $download = (string)($r['download'] ?? '');
             if ($event === 'download') {
                 $downloads[$os] = ($downloads[$os] ?? 0) + 1;
                 $daily[$day]['download'] = ($daily[$day]['download'] ?? 0) + 1;
                 continue;
+            }
+            if ($event === 'fetch') {           // the installer of a download fetched its package: it was run
+                $fetched[$download] = true;
+                continue;
+            }
+            if ($download !== '' && $event === 'install') {
+                $installedDownloads[$download] = true;
             }
             $id = (string)($r['install'] ?? '');
             $run = &$runs[$id];
@@ -108,6 +121,8 @@ final class StatsReport
         $totals = [
             'downloads' => array_sum($downloads),
             'downloadsBySystem' => $downloads,
+            'downloadsRun' => count($fetched),
+            'downloadsInstalled' => count($installedDownloads),
             'starts' => $starts,
             'installs' => $installs,
             'cancels' => $count($runs, 'cancel'),

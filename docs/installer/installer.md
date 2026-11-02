@@ -11,7 +11,9 @@ One executable per system, the same for every package:
 Linux arm64 and phones: not yet (no JumPHP runtime for them).
 
 Users never get these files as they are: a server (or `tools/package-release.php`) writes a package's address into
-a copy: `My-App-setup-k2q9x7a1.exe`.
+a copy: `My-App-setup-k2q9x7a1.exe`. A server may also name each download by an id of its own
+(`My-App-k3x9p2qa7m4z.exe`, 12 letters and digits, since 0.2.5): the installer sends it back when it fetches its
+package (`?download=<id>`) and in its statistics, so the server knows which downloads were run and installed.
 
 ## Where it finds its package
 
@@ -23,7 +25,9 @@ The first of:
 3. the server: `--server=`, env `JUMPHP2INSTALLER_SERVER`, the address written into the executable
    (`jumphp2installer.server` in its php.ini section), else `https://jumphp.net/installers`;
    the package: `--package=`, env `JUMPHP2INSTALLER_PACKAGE`, the id written into it, else the id in its file name
-   (`…-setup-<id>`, even renamed `… (1).exe`);
+   (`…-setup-<id>`, even renamed `… (1).exe`); the download: `--download=`, env `JUMPHP2INSTALLER_DOWNLOAD`, else the id at
+   the end of its file name (`My-App-k3x9p2qa7m4z (1).exe`; macOS: of its `.app`). A file renamed without it still
+   installs (the package id written into it), only uncounted as that download;
 4. a server `github:owner/repo`, `github:owner/repo@tag` or `https://host/folder/` (package `static`): `install.yaml`
    and its files at that address (GitHub: the newest release).
 

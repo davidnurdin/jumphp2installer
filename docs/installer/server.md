@@ -37,7 +37,7 @@ An installer only needs these, without an account (CORS open):
 
 | | |
 |---|---|
-| `GET {server}/api/packages/{id}` | `{"id", "name", "script": "<the YAML>", "assets": "<address of its files>/"}`; 404: unknown or not published |
+| `GET {server}/api/packages/{id}` | `{"id", "name", "script": "<the YAML>", "assets": "<address of its files>/"}`; 404: unknown or not published. `?download=<id>`: the download the installer comes from (its file name), for the server to note that it is being run (optional) |
 | `GET {assets}/{path}` | a file of the package |
 | `POST {server}/api/packages/{id}/stats` | optional: what an installer tells (JSON, [stats.md](stats.md)); `204` |
 
@@ -45,7 +45,7 @@ and to hand installers out:
 
 | | |
 |---|---|
-| `GET {server}/download/{id}/{platform}` | `windows-x86_64` / `macos` / `linux-x86_64`: the base installer with `{server}` and `{id}` written in, named `Name-setup-<id>.exe` / `.zip` / (nothing) |
+| `GET {server}/download/{id}/{platform}` | `windows-x86_64` / `macos` / `linux-x86_64`: the base installer with `{server}` and `{id}` written in, named `Name-setup-<id>.exe` / `.zip` / (nothing), or `Name-<download>.exe`: an id of that download (`Binary::fileName($name, $id, $platform, $download)`, 12 letters and digits), sent back by its installer |
 
 Writing them in: `JumPHP2Installer\Binary::patchFile($base, $out, $server, $id)` (PHP, no dependency), or
 `php tools/make-installer.php <base> <out> <server> <id>`, or `<installer> --make=<out> --server=<server> --package=<id>`.

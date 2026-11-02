@@ -26,6 +26,8 @@ final class Session
     private array $fetches = [];
     private bool $ready = false;
     private bool $planned = false;
+    /** The download the installer comes from (Binary::downloadFromFileName()), or null. */
+    public ?string $download = null;
 
     private function __construct(private readonly ?string $server, private readonly ?string $id, private readonly ?string $file, ?Vars $vars)
     {
@@ -33,10 +35,12 @@ final class Session
         $this->work = $this->vars->get('temp', sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'jumphp2installer-s' . getmypid() . bin2hex(random_bytes(3));
     }
 
-    public static function remote(string $server, string $id, ?Vars $vars = null): self
+    /** @param string|null $download the download this installer comes from (its file name), told to the server */
+    public static function remote(string $server, string $id, ?Vars $vars = null, ?string $download = null): self
     {
         $s = new self(rtrim($server, '/'), $id, null, $vars);
-        $s->fetch('package', Package::url($server, $id), function (Download $d) use ($s, $server, $id): void {
+        $s->download = $download;
+        $s->fetch('package', Package::url($server, $id, $download), function (Download $d) use ($s, $server, $id): void {
             $s->package = Package::fromJson((string)file_get_contents($d->file), Package::url($server, $id), $server);
         });
         return $s;

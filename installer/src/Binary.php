@@ -104,11 +104,18 @@ final class Binary
         return $out;
     }
 
-    /** The file name a server gives: "My App-setup-k2q9x7a1.exe" (an id of the package). */
-    public static function fileName(string $appName, string $package, string $platform): string
+    /** A download's id (Binary::fileName($name, $package, $platform, $download)): 12 letters and digits. */
+    public const DOWNLOAD = '[a-z0-9]{12}';
+
+    /**
+     * The file name a server gives: "My-App-setup-k2q9x7a1.exe" (an id of the package), or, for one download of it,
+     * "My-App-k3x9p2qa7m4z.exe": the id of that download, which the installer sends back when it fetches its package
+     * (the server then knows that download is being installed).
+     */
+    public static function fileName(string $appName, string $package, string $platform, ?string $download = null): string
     {
         $name = trim((string)preg_replace('/[^\w.-]+/u', '-', $appName), '-') ?: 'Setup';
-        return $name . '-setup-' . $package . match (true) {
+        return $name . ($download !== null ? '-' . $download : '-setup-' . $package) . match (true) {
             str_starts_with($platform, 'windows') => '.exe',
             str_starts_with($platform, 'macos') => '.zip',
             default => '',
@@ -119,6 +126,14 @@ final class Binary
     public static function packageFromFileName(string $file): ?string
     {
         return preg_match('/-setup-([a-z0-9]{6,32})(?:[ ._(-]|$)/i', basename($file), $m) ? strtolower($m[1]) : null;
+    }
+
+    /** The download id in a file name made by fileName() with one ("My-App-k3x9p2qa7m4z (1).exe"), or null. */
+    public static function downloadFromFileName(string $file): ?string
+    {
+        $name = (string)preg_replace('/\.(exe|zip|app)$/i', '', basename(str_replace('\\', '/', $file)));
+        $name = (string)preg_replace('/\s*[(\[]\d+[)\]]$/', '', $name);     // "(1)" "[2]": the browser's copies
+        return preg_match('/(?<!-setup)-(' . self::DOWNLOAD . ')$/i', $name, $m) ? strtolower($m[1]) : null;
     }
 
     /** @return array{int, int, string} offset, length, text of the installer's ini section */

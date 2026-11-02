@@ -241,4 +241,12 @@ final class MainTest extends AppTestCase
         Cli::$output = null;
         self::assertSame([], self::events());
     }
+
+    public function testTheDownloadIsReadFromTheExecutablesNameOrItsApp(): void
+    {
+        self::assertSame('k3x9p2qa7m4z', \App\Source::downloadOf('C:\\Users\\a\\Downloads\\JumPHP-IDE-k3x9p2qa7m4z (1).exe'));
+        self::assertSame('k3x9p2qa7m4z', \App\Source::downloadOf('/Users/a/Downloads/JumPHP-IDE-k3x9p2qa7m4z.app/Contents/MacOS/installer'));
+        self::assertNull(\App\Source::downloadOf('/Users/a/Downloads/JumPHP IDE.app/Contents/MacOS/installer'));
+        self::assertNull(\App\Source::downloadOf('/home/a/JumPHP-IDE-setup-fq3zba5t'));
+    }
 }

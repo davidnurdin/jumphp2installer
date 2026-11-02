@@ -144,10 +144,10 @@ final class Stats
     }
 
     /** The fields of every event, from a package and this computer. */
-    public static function base(Package $package, string $version, Vars $vars, string $installer, string $mode): array
+    public static function base(Package $package, string $version, Vars $vars, string $installer, string $mode, ?string $download = null): array
     {
         $app = $package->script->toArray()['app'] ?? [];
-        return [
+        return ($download !== null ? ['download' => $download] : []) + [
             'package' => $package->id,
             'app' => (string)($app['id'] ?? ''),
             'version' => $version,

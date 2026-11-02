@@ -66,7 +66,7 @@ class InstallEvent
         $this->createdAt = new \DateTimeImmutable();
         $this->day = $this->createdAt->setTime(0, 0);
         foreach (\JumPHP2Installer\StatsReport::KEPT as $field) {
-            if (array_key_exists($field, $row) && $row[$field] !== null) {
+            if (property_exists($this, $field) && array_key_exists($field, $row) && $row[$field] !== null) {
                 $this->$field = $field === 'seconds' ? (float)$row[$field] : (string)$row[$field];
             }
         }

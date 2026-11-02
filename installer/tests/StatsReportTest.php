@@ -30,6 +30,27 @@ final class StatsReportTest extends TestCase
         self::assertNull(StatsReport::accept(['event' => 'hack', 'install' => str_repeat('a', 32)]));
         self::assertNull(StatsReport::accept(['event' => 'start', 'install' => 'short']));
         self::assertNull(StatsReport::accept('nope'));
+        self::assertNull($row['download']);
+        self::assertSame('k3x9p2qa7m4z', StatsReport::accept(['event' => 'start', 'install' => str_repeat('a', 32), 'download' => 'k3x9p2qa7m4z'])['download']);
+        self::assertNull(StatsReport::accept(['event' => 'start', 'install' => str_repeat('a', 32), 'download' => '../x'])['download']);
+    }
+
+    public function testTheDashboardTellsWhichDownloadsWereRunAndInstalled(): void
+    {
+        $rows = array_merge(
+            [['event' => 'download', 'download' => 'aaaaaaaaaaa1', 'os' => 'windows-x86_64', 'install' => '', 'day' => '2026-11-02'],
+             ['event' => 'download', 'download' => 'aaaaaaaaaaa2', 'os' => 'windows-x86_64', 'install' => '', 'day' => '2026-11-02'],
+             ['event' => 'download', 'download' => 'aaaaaaaaaaa3', 'os' => 'linux-x86_64', 'install' => '', 'day' => '2026-11-02'],
+             ['event' => 'fetch', 'download' => 'aaaaaaaaaaa1', 'os' => 'windows-x86_64', 'install' => '', 'day' => '2026-11-02'],
+             ['event' => 'fetch', 'download' => 'aaaaaaaaaaa1', 'os' => 'windows-x86_64', 'install' => '', 'day' => '2026-11-02'],
+             ['event' => 'fetch', 'download' => 'aaaaaaaaaaa2', 'os' => 'windows-x86_64', 'install' => '', 'day' => '2026-11-02']],
+            self::runOf('1', '2026-11-02', ['start', ['install', ['download' => 'aaaaaaaaaaa1']]]),
+        );
+        $r = StatsReport::build($rows, [], 1, '2026-11-02');
+        self::assertSame(3, $r['totals']['downloads']);
+        self::assertSame(2, $r['totals']['downloadsRun']);
+        self::assertSame(1, $r['totals']['downloadsInstalled']);
+        self::assertSame(1, $r['totals']['starts']);
     }
 
     public function testTheDashboardCountsRunsWhereTheyStoppedAndWhy(): void

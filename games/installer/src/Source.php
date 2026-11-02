@@ -13,6 +13,8 @@ use JumPHP2Installer\Uninstaller;
  *   --uninstall, or a manifest next to this executable        the uninstaller of an install (uninstall.json)
  *   --server= / env JUMPHP2INSTALLER_SERVER / the executable's php.ini section (jumphp2installer.server) / DEFAULT_SERVER
  *   --package= / env JUMPHP2INSTALLER_PACKAGE / its php.ini section (jumphp2installer.package) / its file name (-setup-<id>)
+ *   --download= / env JUMPHP2INSTALLER_DOWNLOAD / its file name ("My-App-k3x9p2qa7m4z.exe", Binary::fileName()):
+ *     the download it comes from, sent with the package's request (the server knows that download is being installed)
  *   server "github:owner/repo" or package "static": install.yaml and its files at that address / in that release
  *   demo/install.yaml                                         not exported, nothing asked (bin/jumphp app:run / app:shot)
  */
@@ -29,6 +31,7 @@ final class Source
         public readonly ?string $package = null,
         public readonly ?array $manifest = null,
         public readonly ?string $problem = null,
+        public readonly ?string $download = null,
     ) {
     }
 
@@ -84,14 +87,25 @@ final class Source
         if (!preg_match('#^https?://#', $server) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/', $package)) {
             return new self('none', problem: "Not a package: $package on $server.");
         }
-        return new self('remote', server: $server, package: $package);
+        $download = $opt('download') ?? (getenv('JUMPHP2INSTALLER_DOWNLOAD') ?: null) ?? ($exe !== null ? self::downloadOf($exe) : null);
+        return new self('remote', server: $server, package: $package,
+            download: $download !== null && preg_match('/^' . Binary::DOWNLOAD . '$/', $download) ? $download : null);
+    }
+
+    /** The download in the executable's name, or (macOS) in its .app's: ".../My-App-k3x9p2qa7m4z.app/Contents/MacOS/x". */
+    public static function downloadOf(string $exe): ?string
+    {
+        if (preg_match('#([^/\\\\]+)\.app[/\\\\]Contents[/\\\\]MacOS[/\\\\]#', $exe, $m) && ($d = Binary::downloadFromFileName($m[1])) !== null) {
+            return $d;
+        }
+        return Binary::downloadFromFileName($exe);
     }
 
     public function session(): ?Session
     {
         return match ($this->mode) {
             'local' => Session::local((string)$this->script),
-            'remote' => Session::remote((string)$this->server, (string)$this->package),
+            'remote' => Session::remote((string)$this->server, (string)$this->package, null, $this->download),
             'static' => Session::static((string)$this->server),
             default => null,
         };

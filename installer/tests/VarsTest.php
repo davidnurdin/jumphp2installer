@@ -59,6 +59,14 @@ final class VarsTest extends TestCase
         self::assertSame('k2q9x7a1', Binary::packageFromFileName('C:\\Downloads\\Hello-App-setup-k2q9x7a1 (1).exe'));
         self::assertSame('k2q9x7a1', Binary::packageFromFileName('/home/a/Hello-App-setup-k2q9x7a1'));
         self::assertNull(Binary::packageFromFileName('/home/a/setup.exe'));
+        // one download: its id in the name, the browser's " (1)" and a renamed file tolerated
+        self::assertSame('Hello-App-k3x9p2qa7m4z.exe', Binary::fileName('Hello App', 'k2q9x7a1', 'windows-x86_64', 'k3x9p2qa7m4z'));
+        self::assertSame('k3x9p2qa7m4z', Binary::downloadFromFileName('C:\\Users\\a\\Downloads\\Hello-App-k3x9p2qa7m4z (1).exe'));
+        self::assertSame('k3x9p2qa7m4z', Binary::downloadFromFileName('/home/a/Hello-App-k3x9p2qa7m4z'));
+        self::assertSame('k3x9p2qa7m4z', Binary::downloadFromFileName('Hello-App-k3x9p2qa7m4z.app'));
+        self::assertNull(Binary::downloadFromFileName('/home/a/Hello-App-setup-k2q9x7a1abcd.exe'));
+        self::assertNull(Binary::downloadFromFileName('/home/a/setup.exe'));
+        self::assertNull(Binary::downloadFromFileName('/home/a/Hello-App.exe'));
 
         // a released installer reserves room: patched, it keeps its size exactly
         $ini = "ffi.enable=1\n" . Binary::RESERVE . str_repeat('.', 400) . "\n";

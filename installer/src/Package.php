@@ -7,6 +7,7 @@ namespace JumPHP2Installer;
  *
  * The API every server answers (docs/installer/server.md), {server} being its address:
  *   GET {server}/api/packages/{id}                -> {"id", "name", "script" (the YAML), "assets" (address of its files)}
+ *       ?download={download}                      (the download the installer comes from: its file name says, Binary::fileName())
  *   GET {server}/api/packages/{id}/assets/{file}  -> a file of the package (assets: "images/banner.png")
  *   GET {server}/download/{id}/{platform}         -> the installer with the server and the id written in (Binary)
  *
@@ -47,9 +48,9 @@ final class Package
         return new self('static', Script::parse($yaml), $base, $source, $flat);
     }
 
-    public static function url(string $server, string $id): string
+    public static function url(string $server, string $id, ?string $download = null): string
     {
-        return rtrim($server, '/') . '/api/packages/' . rawurlencode($id);
+        return rtrim($server, '/') . '/api/packages/' . rawurlencode($id) . ($download !== null ? '?download=' . rawurlencode($download) : '');
     }
 
     /** What GET /api/packages/{id} answered ($url: that address, to resolve a relative "assets"). */
@@ -59,7 +60,7 @@ final class Package
         if (!is_array($data) || !is_string($data['script'] ?? null)) {
             throw new \RuntimeException('the server did not answer an installer package (' . substr(trim($json), 0, 80) . ')');
         }
-        $assets = (string)($data['assets'] ?? rtrim($url, '/') . '/assets/');
+        $assets = (string)($data['assets'] ?? rtrim((string)strtok($url, '?'), '/') . '/assets/');
         if (!preg_match('#^https?://#', $assets)) {
             $p = parse_url($url);
             $assets = ($p['scheme'] ?? 'https') . '://' . ($p['host'] ?? '') . (isset($p['port']) ? ':' . $p['port'] : '') . '/' . ltrim($assets, '/');
