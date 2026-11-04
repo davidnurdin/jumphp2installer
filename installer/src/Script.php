@@ -34,7 +34,7 @@ final class Script
 {
     public const FORMAT = 1;
     public const PAGES = ['welcome', 'license', 'folder', 'options', 'install', 'finish'];
-    public const STEPS = ['download', 'extract', 'copy', 'mkdir', 'write', 'executable', 'command', 'shortcut', 'run', 'delete', 'uninstaller'];
+    public const STEPS = ['download', 'extract', 'copy', 'mkdir', 'write', 'executable', 'command', 'shortcut', 'autostart', 'run', 'delete', 'uninstaller'];
     public const SYSTEMS = ['windows', 'linux', 'macos'];
 
     /** @var list<Problem> */
@@ -354,6 +354,14 @@ final class Script
                         $this->problem("$path.write", 'write: {file: <path>, text: ...}');
                     }
                     $s += ['file' => (string)($value['file'] ?? ''), 'text' => (string)($value['text'] ?? '')];
+                    break;
+                case 'autostart':
+                    $v = $map('target');
+                    if (!isset($v['target'], $v['id']) || !preg_match('/^[A-Za-z0-9._-]+$/', (string)$v['id'])) {
+                        $this->problem("$path.autostart", 'autostart: {target: "{folder}/myapp{exe}" (macOS: the folder holding the .app), id: myapp, identifier: net.example.myapp}');
+                    }
+                    $s += ['target' => (string)($v['target'] ?? ''), 'id' => (string)($v['id'] ?? ''), 'name' => (string)($v['name'] ?? '{app}'),
+                        'identifier' => (string)($v['identifier'] ?? ('net.jumphp.' . preg_replace('/[^a-z0-9]+/', '', strtolower((string)($v['id'] ?? '')))))];
                     break;
                 case 'shortcut':
                     $v = $map('target');

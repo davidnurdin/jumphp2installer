@@ -148,6 +148,26 @@ final class RunnerTest extends TestCase
         self::assertSame("PATH=\"\$HOME/.local/bin:\$PATH\"\n", file_get_contents("$this->root/home/.profile"));
     }
 
+    public function testTheAppStartsWithTheComputerAndTheUninstallerTakesItOut(): void
+    {
+        $package = $this->package("app: {name: Hello World}\npages: [welcome, {options: {autostart: {label: Start with the computer, default: false}}}, install]\nsteps:\n  - download: hello.zip\n  - extract: {strip: 1}\n  - autostart: {target: \"{folder}/hello\", id: hello}\n    if: autostart\n  - uninstaller\n");
+        $entry = "$this->root/home/.config/autostart/hello.desktop";
+        // unticked (its default): no entry
+        $folder = "$this->root/home/opt/Hello";
+        self::assertTrue((new Runner($package, $this->vars($package, ['autostart' => false]), null, "$this->pkg/self.bin"))->runAll());
+        self::assertFileDoesNotExist($entry);
+        (new Uninstaller(Uninstaller::find($folder) ?? [], "$folder/uninstall"))->runAll();
+
+        $runner = new Runner($package, $this->vars($package, ['autostart' => true]), null, "$this->pkg/self.bin");
+        self::assertTrue($runner->runAll(), implode("\n", $runner->log));
+        self::assertFileExists($entry);
+        $text = (string)file_get_contents($entry);
+        self::assertStringContainsString("Exec=$folder/hello --autostart", $text);
+        self::assertStringContainsString('Name=Hello World', $text);
+        (new Uninstaller(Uninstaller::find($folder) ?? [], "$folder/uninstall"))->runAll();
+        self::assertFileDoesNotExist($entry);
+    }
+
     public function testThePathScriptAddsAndTakesOutOnlyItsFolder(): void
     {
         $add = Runner::pathScript("C:\\Users\\o'brien\\Apps\\Todo", true);

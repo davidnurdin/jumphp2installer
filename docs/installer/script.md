@@ -106,6 +106,7 @@ A failing step stops the installation and shows its error and the details.
 | `executable` | a file | makes it executable (Linux, macOS; nothing on Windows) |
 | `command` | a program | typed by its name in a terminal (a CLI app, since 0.2.8): Windows, its folder added to the user's `Path` (taken out by the uninstaller); Linux and macOS, a link in `~/.local/bin` (removed by the uninstaller), that folder added to `~/.profile` / `~/.zprofile` when the PATH lacks it (the line stays). New terminals see it |
 | `shortcut` | `{target, name, where, icon}` | `where`: `desktop`, `menu` or `both` (default). Windows: `.lnk`; Linux: `.desktop` files; macOS: a link on the desktop (no menu) |
+| `autostart` | `{target, id, identifier, name}` | the app started with the computer, with `--autostart` (since 0.2.9): Windows, the value `id` of `HKCU\…\CurrentVersion\Run`; macOS, `~/Library/LaunchAgents/<identifier>.plist` opening the `.app` (`target`: the `.app`, or the folder holding it); Linux, `~/.config/autostart/<id>.desktop`. Taken out by the uninstaller. Usually with `if:` an option ("Start … with the computer") |
 | `run` | a command, or `{command, wait}` | runs it in `{folder}`; `wait: false` does not wait; a command that fails stops the installation |
 | `delete` | a path | only inside the install folder, the home folder or the temporary folder |
 | `uninstaller` | (nothing), or `{name}` | puts the uninstaller in the folder and registers it: Windows "Apps" list (no admin rights needed), Linux menu entry "Uninstall {app}" |

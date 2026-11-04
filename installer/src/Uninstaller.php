@@ -34,6 +34,9 @@ final class Uninstaller
         foreach (PHP_OS_FAMILY === 'Windows' ? (array)($manifest['path'] ?? []) : [] as $dir) {
             $this->todo[] = ['path', (string)$dir];
         }
+        foreach (PHP_OS_FAMILY === 'Windows' ? (array)($manifest['runvalues'] ?? []) : [] as $id) {
+            $this->todo[] = ['runvalue', (string)$id];
+        }
         if (($manifest['registry'] ?? null) && PHP_OS_FAMILY === 'Windows') {
             $this->todo[] = ['registry', (string)$manifest['registry']];
         }
@@ -108,6 +111,9 @@ final class Uninstaller
                     break;
                 case 'registry':
                     $this->commands[] = new Command(['reg.exe', 'delete', $path, '/f']);
+                    return false;
+                case 'runvalue':    // an autostart step's value of HKCU\...\Run
+                    $this->commands[] = new Command(['reg.exe', 'delete', Runner::RUN_KEY, '/v', $path, '/f']);
                     return false;
                 case 'path':        // the folder a `command` step put in the user's Path
                     $this->commands[] = new Command(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', Runner::pathScript($path, false)]);

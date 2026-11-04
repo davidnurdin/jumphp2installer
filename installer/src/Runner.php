@@ -165,6 +165,7 @@ final class Runner
             'command' => $this->stepCommand($step),
             'delete' => $this->stepDelete($step),
             'shortcut' => $this->stepShortcut($step),
+            'autostart' => $this->stepAutostart($step),
             'run' => $this->stepRun($step),
             'uninstaller' => $this->stepUninstaller($step),
             default => throw new \RuntimeException("unknown step {$step['action']}"),
@@ -381,6 +382,66 @@ final class Runner
         foreach ($this->commands as $c) {
             if (!$c->ok()) {
                 $this->log[] = '  the Path: ' . trim(substr($c->output, -300));
+            }
+        }
+        $this->commands = [];
+        return true;
+    }
+
+    public const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+
+    /**
+     * The app started with the computer, the entry the app itself writes (JumPHP\Native\Autostart, with --autostart):
+     * Windows, the value <id> of HKCU\...\Run; macOS, a LaunchAgent opening the .app; Linux, ~/.config/autostart/<id>.desktop.
+     * The uninstaller takes it out.
+     */
+    private function stepAutostart(array $step): bool
+    {
+        $target = $this->vars->path($step['target']);
+        if ($this->fraction === 0.0) {
+            $this->fraction = 0.01;
+            $os = Vars::os();
+            if ($os === 'macos' && is_dir($target) && !str_ends_with($target, '.app')) {
+                $target = (glob("$target/*.app") ?: [$target])[0];
+            }
+            if (!file_exists($target)) {
+                throw new \RuntimeException("autostart: no file $target");
+            }
+            $id = $step['id'];
+            if ($os === 'windows') {
+                $this->manifest['runvalues'][] = $id;
+                $this->commands[] = new Command(['reg.exe', 'add', self::RUN_KEY, '/v', $id, '/t', 'REG_SZ', '/d', '"' . $target . '" --autostart', '/f']);
+            } else {
+                $home = $this->vars->get('home');
+                if ($os === 'macos') {
+                    $e = fn (string $s) => htmlspecialchars($s, ENT_XML1 | ENT_QUOTES);
+                    $args = str_ends_with($target, '.app') ? ['/usr/bin/open', '-a', $target, '--args', '--autostart'] : [$target, '--autostart'];
+                    $file = "$home/Library/LaunchAgents/" . $step['identifier'] . '.plist';
+                    $text = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                        . "<plist version=\"1.0\">\n<dict>\n    <key>Label</key>\n    <string>{$e($step['identifier'])}</string>\n    <key>ProgramArguments</key>\n    <array>"
+                        . implode('', array_map(fn ($a) => "\n        <string>{$e($a)}</string>", $args))
+                        . "\n    </array>\n    <key>RunAtLoad</key>\n    <true/>\n    <key>ProcessType</key>\n    <string>Interactive</string>\n</dict>\n</plist>\n";
+                } else {
+                    $file = "$home/.config/autostart/$id.desktop";
+                    $exec = implode(' ', array_map(fn ($a) => preg_match('/[\s"\\\\`$]/', $a) ? '"' . addcslashes($a, '"\\`$') . '"' : $a, [$target, '--autostart']));
+                    $text = "[Desktop Entry]\nType=Application\nName=" . str_replace("\n", ' ', $this->vars->expand($step['name'])) . "\nExec=$exec\nTerminal=false\nX-GNOME-Autostart-enabled=true\n";
+                }
+                if (!is_dir(dirname($file)) && !@mkdir(dirname($file), 0755, true) || @file_put_contents($file, $text) === false) {
+                    throw new \RuntimeException("autostart: cannot write $file");
+                }
+                $this->manifest['shortcuts'][] = $file;
+                $this->log[] = "  started with the computer: $file";
+                return true;
+            }
+        }
+        foreach ($this->commands as $c) {
+            if (!$c->isDone()) {
+                return false;
+            }
+        }
+        foreach ($this->commands as $c) {
+            if (!$c->ok()) {
+                $this->log[] = '  start with the computer: ' . trim(substr($c->output, -300));
             }
         }
         $this->commands = [];
@@ -732,6 +793,7 @@ final class Runner
             'command' => 'Making ' . basename((string)$step['path']) . ' a command',
             'delete' => 'Removing ' . basename((string)$step['path']),
             'shortcut' => 'Making the shortcuts',
+            'autostart' => 'Starting it with the computer',
             'run' => 'Running ' . basename(strtok((string)$step['command'], ' ') ?: ''),
             'uninstaller' => 'Writing the uninstaller',
             default => (string)$step['action'],
