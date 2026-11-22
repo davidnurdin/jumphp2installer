@@ -1,3 +1,6 @@
+> **⚠️ This repository has moved to [https://git.jumphp.net/jumphp/jumphp2installer](https://git.jumphp.net/jumphp/jumphp2installer)** — it is archived here (read-only) and no longer updated.
+> **⚠️ Ce dépôt a déménagé sur [https://git.jumphp.net/jumphp/jumphp2installer](https://git.jumphp.net/jumphp/jumphp2installer)** — il est archivé ici (lecture seule) et n'est plus mis à jour.
+
 # jumphp2installer
 
 **Native installers from a readable script.** Write what to install in a few lines of YAML (where the newest version
